@@ -1,32 +1,5 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "devCommand": "npm run dev",
-  "framework": "vite",
-  "env": [
-    {
-      "key": "VITE_FIREBASE_API_KEY",
-      "description": "Firebase API Key"
-    },
-    {
-      "key": "VITE_FIREBASE_AUTH_DOMAIN",
-      "description": "Firebase Auth Domain"
-    },
-    {
-      "key": "VITE_FIREBASE_PROJECT_ID",
-      "description": "Firebase Project ID"
-    },
-    {
-      "key": "VITE_FIREBASE_STORAGE_BUCKET",
-      "description": "Firebase Storage Bucket"
-    },
-    {
-      "key": "VITE_FIREBASE_MESSAGING_SENDER_ID",
-      "description": "Firebase Messaging Sender ID"
-    },
-    {
-      "key": "VITE_FIREBASE_APP_ID",
-      "description": "Firebase App ID"
-    }
-  ]
+  "framework": "vite"
 }
