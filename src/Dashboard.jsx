@@ -1,12 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, ComposedChart
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, ComposedChart, Bar, Line
 } from 'recharts';
 import {
   calculateNetWorth,
-  calculateMonthlySpending,
-  calculateSpendingByCategory,
   formatFull,
   formatShort,
   getCategoryColor,
@@ -18,120 +16,154 @@ import {
 
 const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Others'];
 
-export default function Dashboard({ accounts, transactions, budgets, recurringBills = [] }) {
-  const [editingBudgets, setEditingBudgets] = useState(false);
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+function getMonthLabel(year, month) {
+  return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
 
-  const netWorth = calculateNetWorth(accounts);
-  const monthlySpending = calculateMonthlySpending(transactions, currentMonth, currentYear);
-  const spendingByCategory = calculateSpendingByCategory(transactions, currentMonth, currentYear);
+function calcSpending(transactions, month, year) {
+  return transactions.filter(tx => {
+    const d = new Date(tx.date);
+    return d.getMonth() === month - 1 && d.getFullYear() === year && tx.type === 'expense';
+  }).reduce((sum, tx) => sum + toAED(tx.amount, tx.currency), 0);
+}
+
+function calcByCategory(transactions, month, year) {
+  const out = {};
+  transactions.filter(tx => {
+    const d = new Date(tx.date);
+    return d.getMonth() === month - 1 && d.getFullYear() === year && tx.type === 'expense';
+  }).forEach(tx => {
+    const amt = toAED(tx.amount, tx.currency);
+    out[tx.category] = (out[tx.category] || 0) + amt;
+  });
+  return out;
+}
+
+export default function Dashboard({ accounts, transactions, budgets, recurringBills = [] }) {
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
+
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1;
   const dayProgress = getDayProgress();
 
-  // Budget data
-  const budgetMap = {};
-  budgets.forEach(b => {
-    if (b.year === currentYear && b.month === currentMonth) {
-      budgetMap[b.category] = b.monthlyLimit;
-    }
-  });
+  function prevMonth() {
+    if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12); }
+    else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewYear > now.getFullYear() || (viewYear === now.getFullYear() && viewMonth >= now.getMonth() + 1)) return;
+    if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); }
+    else setViewMonth(m => m + 1);
+  }
 
-  const totalBudget = Object.values(budgetMap).reduce((a, b) => a + b, 0);
-  const spentPct = totalBudget > 0 ? (monthlySpending / totalBudget) * 100 : 0;
+  const netWorth = calculateNetWorth(accounts);
 
-  // Annual savings
-  const annualSavings = 177691;
-
-  // Capital breakdown
+  // Capital
   const capitalAccounts = accounts.filter(a => a.netWorthBucket === 'capital');
   const capitalTotal = capitalAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
-  // Assets breakdown
+  // Usable
   const usableAccounts = accounts.filter(a => a.netWorthBucket === 'usable');
   const usableTotal = usableAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
   // Future assets
-  const futureAccounts = accounts.filter(a => a.netWorthBucket === 'future');
-  let futureAssets = 0, liabilities = 0;
-  futureAccounts.forEach(a => {
-    const aedBal = toAED(a.currentBalance, a.currency);
-    if (a.kind === 'asset') futureAssets += aedBal;
-    else liabilities += Math.abs(aedBal);
-  });
+  const futureAssetAccounts = accounts.filter(a => a.netWorthBucket === 'future' && a.kind === 'asset');
+  const futureAssetsTotal = futureAssetAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
-  // Spending detail data
+  // Future liabilities — name-based: anything in debt bucket WITHOUT "Credit" in name is a loan/liability
+  const futureLiabilityAccounts = accounts.filter(a =>
+    (a.netWorthBucket === 'future' && a.kind === 'liability') ||
+    (a.netWorthBucket === 'debt' && !a.name.toLowerCase().includes('credit'))
+  );
+  const futureLiabilitiesTotal = futureLiabilityAccounts.reduce((sum, a) => sum + Math.abs(toAED(a.currentBalance, a.currency)), 0);
+
+  // Credit cards — only accounts with "Credit" in name
+  const creditCardAccounts = accounts.filter(a =>
+    a.netWorthBucket === 'debt' && a.name.toLowerCase().includes('credit')
+  );
+  const creditCardTotal = creditCardAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
+
+  // Spending for selected month
+  const monthlySpending = calcSpending(transactions, viewMonth, viewYear);
+  const spendingByCategory = calcByCategory(transactions, viewMonth, viewYear);
+
+  // Budgets for selected month — parseInt guards against Firestore string types
+  const budgetMap = {};
+  budgets.forEach(b => {
+    if (parseInt(b.year) === viewYear && parseInt(b.month) === viewMonth) {
+      budgetMap[b.category] = b.monthlyLimit;
+    }
+  });
+  const totalBudget = Object.values(budgetMap).reduce((a, b) => a + b, 0);
+  const spentPct = totalBudget > 0 ? (monthlySpending / totalBudget) * 100 : 0;
+
+  // Annual savings (static for now)
+  const annualSavings = 177691;
+
+  // Spending detail
   const spendingData = CATEGORIES.map(cat => ({
     category: cat,
     spent: spendingByCategory[cat] || 0,
     budget: budgetMap[cat] || 0,
   })).filter(d => d.spent > 0 || d.budget > 0);
+  const maxSpent = Math.max(...spendingData.map(d => d.spent), 1);
 
-  // Monthly Flow data - last 12 months
+  // Monthly Flow - last 12 months
   const monthlyFlowData = useMemo(() => {
     const monthMap = {};
-    const last12Months = [];
-
+    const last12 = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date();
+      d.setDate(1);
       d.setMonth(d.getMonth() - i);
-      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      last12Months.push(monthKey);
-      monthMap[monthKey] = { month: monthKey, real: 0, projected: 0 };
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      last12.push(key);
+      monthMap[key] = { key, income: 0, expenses: 0 };
     }
-
-    transactions.filter(t => t.type === 'expense').forEach(tx => {
-      const date = new Date(tx.date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (monthMap[monthKey]) {
-        monthMap[monthKey].real += toAED(tx.amount, tx.currency);
-      }
+    transactions.forEach(tx => {
+      const d = new Date(tx.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthMap[key]) return;
+      const amt = toAED(tx.amount, tx.currency);
+      if (tx.type === 'expense') monthMap[key].expenses += amt;
+      else if (tx.type === 'income') monthMap[key].income += amt;
     });
-
-    // Projected = real spending for months in past + average for future
-    const avgSpending = Object.values(monthMap).reduce((sum, m) => sum + m.real, 0) / last12Months.length;
-    last12Months.forEach((monthKey, idx) => {
-      if (idx < 11) {
-        monthMap[monthKey].projected = monthMap[monthKey].real;
-      } else {
-        monthMap[monthKey].projected = avgSpending;
-      }
-    });
-
-    return last12Months.map(k => ({
-      ...monthMap[k],
-      monthShort: new Date(k + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+    return last12.map(key => ({
+      ...monthMap[key],
+      savings: monthMap[key].income - monthMap[key].expenses,
+      label: new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
     }));
   }, [transactions]);
 
-  // Wealth Trajectory data
+  // Wealth Trajectory - simulated based on current values
   const wealthData = useMemo(() => {
-    const last12Months = [];
+    const pts = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date();
+      d.setDate(1);
       d.setMonth(d.getMonth() - i);
-      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      last12Months.push(monthKey);
+      const f = (11 - i) / 11;
+      pts.push({
+        label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        Capital: Math.round(capitalTotal * (0.82 + f * 0.18)),
+        Usable: Math.round(usableTotal * (0.88 + f * 0.12)),
+        Future: Math.round((futureAssetsTotal - futureLiabilitiesTotal) * (0.87 + f * 0.13)),
+        NetWorth: Math.round(netWorth.total * (0.84 + f * 0.16)),
+      });
     }
-
-    return last12Months.map((monthKey, idx) => ({
-      month: monthKey,
-      monthShort: new Date(monthKey + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-      capital: capitalTotal * (0.8 + idx * 0.02),
-      usable: usableTotal * (0.9 + idx * 0.01),
-      future: (futureAssets - liabilities) * (0.85 + idx * 0.015),
-      netWorth: netWorth.total * (0.85 + idx * 0.025)
-    }));
-  }, [transactions, capitalTotal, usableTotal, futureAssets, liabilities, netWorth.total]);
+    return pts;
+  }, [capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, netWorth.total]);
 
   // Recurring bills
   const recurringBillsData = recurringBills.map(bill => ({
     ...bill,
-    aedAmount: toAED(bill.amount, bill.currency),
-    daysUntilDue: Math.ceil((new Date(bill.dueDate) - now) / (1000 * 60 * 60 * 24))
+    daysUntilDue: bill.dueDate
+      ? Math.ceil((new Date(bill.dueDate) - now) / 86400000)
+      : (bill.dueDay ? bill.dueDay - now.getDate() : null),
   }));
-  const overdueBills = recurringBillsData.filter(b => b.daysUntilDue < 0);
-  const dueSoonBills = recurringBillsData.filter(b => b.daysUntilDue >= 0 && b.daysUntilDue <= 7);
+  const overdueBills = recurringBillsData.filter(b => b.daysUntilDue != null && b.daysUntilDue < 0);
+  const dueSoonBills = recurringBillsData.filter(b => b.daysUntilDue != null && b.daysUntilDue >= 0 && b.daysUntilDue <= 7);
 
   // Recent transactions
   const recentTx = transactions
@@ -141,26 +173,15 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
   return (
     <div className="space-y-6 pb-12">
+
       {/* Alert Banner */}
       {(overdueBills.length > 0 || dueSoonBills.length > 0) && (
-        <div className={`rounded-2xl p-4 border ${
-          overdueBills.length > 0
-            ? 'bg-red-900/20 border-red-700'
-            : 'bg-amber-900/20 border-amber-700'
-        }`}>
+        <div className={`rounded-2xl p-4 border ${overdueBills.length > 0 ? 'bg-red-900/20 border-red-700' : 'bg-amber-900/20 border-amber-700'}`}>
           <div className="flex items-start gap-3">
             <span className="text-xl mt-1">{overdueBills.length > 0 ? '⚠️' : '📅'}</span>
             <div>
-              {overdueBills.length > 0 && (
-                <p className="text-red-400 font-semibold mb-1">
-                  {overdueBills.length} bill{overdueBills.length !== 1 ? 's' : ''} overdue
-                </p>
-              )}
-              {dueSoonBills.length > 0 && (
-                <p className="text-amber-400 text-sm">
-                  {dueSoonBills.length} bill{dueSoonBills.length !== 1 ? 's' : ''} due within 7 days
-                </p>
-              )}
+              {overdueBills.length > 0 && <p className="text-red-400 font-semibold mb-1">{overdueBills.length} bill{overdueBills.length !== 1 ? 's' : ''} overdue</p>}
+              {dueSoonBills.length > 0 && <p className="text-amber-400 text-sm">{dueSoonBills.length} bill{dueSoonBills.length !== 1 ? 's' : ''} due within 7 days</p>}
             </div>
           </div>
         </div>
@@ -168,49 +189,69 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
       {/* Top KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
         {/* NET WORTH */}
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 card">
+        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">NET WORTH</span>
             <span className="text-lg">💎</span>
           </div>
-          <div className="text-3xl font-bold text-white mb-2">{formatShort(netWorth.total)}</div>
+          <div className="text-3xl font-bold text-white mb-1">{formatShort(netWorth.total)}</div>
           <div className="text-xs text-emerald-400">+7.9% (88.3K) vs last month</div>
         </div>
 
         {/* SPENT THIS MONTH */}
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 card">
+        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">SPENT THIS MONTH</span>
             <span className="text-lg">💸</span>
           </div>
-          <div className="text-3xl font-bold text-white mb-2">{formatFull(monthlySpending)}</div>
+          <div className="text-3xl font-bold text-white mb-1">{formatFull(monthlySpending)}</div>
           <div className="flex items-center justify-between text-xs text-gray-500 mt-3">
-            <span>of {formatFull(totalBudget)} · {Math.round(spentPct)}% used</span>
+            <span>
+              of {totalBudget > 0 ? formatFull(totalBudget) : '—'} · {totalBudget > 0 ? `${Math.round(spentPct)}% used` : 'no budget set'}
+            </span>
             <span>Day {dayProgress.day}/{dayProgress.daysInMonth}</span>
           </div>
-          <div className="w-full bg-gray-800 rounded-full h-2 mt-2 overflow-hidden">
+          <div className="relative w-full bg-gray-800 rounded-full h-2 mt-2">
+            {totalBudget > 0 && (
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(spentPct, 100)}%`,
+                  backgroundColor: spentPct > 100 ? '#ef4444' : spentPct > 75 ? '#f59e0b' : '#10b981',
+                }}
+              />
+            )}
+            {/* Pace marker — white line showing where spending should be today */}
             <div
-              className={`h-full transition-all ${spentPct > 85 ? 'bg-red-500' : spentPct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-              style={{ width: `${Math.min(spentPct, 100)}%` }}
+              className="absolute top-0 bottom-0 w-0.5 rounded-full"
+              style={{ left: `${dayProgress.pct}%`, backgroundColor: '#ffffff', opacity: 0.8 }}
             />
           </div>
+          {totalBudget > 0 && (
+            <div className="text-xs mt-1" style={{ color: spentPct <= dayProgress.pct ? '#10b981' : '#f59e0b' }}>
+              {spentPct <= dayProgress.pct ? '↓ Under pace' : '↑ Ahead of pace'}
+              {' '}— pace at {Math.round(dayProgress.pct)}%
+            </div>
+          )}
         </div>
 
         {/* ANNUAL SAVINGS */}
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 card">
+        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">ANNUAL SAVINGS TRACKER</span>
             <span className="text-lg">📅</span>
           </div>
-          <div className="text-3xl font-bold text-white mb-2">{formatFull(annualSavings)}</div>
+          <div className="text-3xl font-bold text-white mb-1">{formatFull(annualSavings)}</div>
           <div className="text-xs text-gray-500">Jan–May real savings</div>
           <div className="flex items-center justify-between text-xs text-gray-500 mt-3">
             <span>Projected year-end</span>
             <span className="text-emerald-400">{formatFull(230171)}</span>
           </div>
-          <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
-            <div className="w-5/12 bg-emerald-500 rounded-full h-2" />
+          <div className="relative w-full bg-gray-800 rounded-full h-2 mt-2">
+            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(5 / 12) * 100}%` }} />
+            <div className="absolute top-0 bottom-0 w-0.5 rounded-full" style={{ left: `${(now.getMonth() / 12) * 100}%`, backgroundColor: '#ffffff', opacity: 0.7 }} />
           </div>
           <span className="text-xs text-emerald-400 mt-1 block">↑ Ahead of pace 5/12 months</span>
         </div>
@@ -218,6 +259,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
       {/* Capital & Assets Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
         {/* Capital */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
           <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Capital: {formatFull(capitalTotal)}</h3>
@@ -229,9 +271,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
               </div>
             ))}
           </div>
-          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
-            Liquid • immediately available
-          </div>
+          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">Liquid • immediately available</div>
         </div>
 
         {/* Assets - Usable */}
@@ -245,169 +285,195 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
               </div>
             ))}
           </div>
-          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
-            Sellable within days
-          </div>
+          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">Sellable within days</div>
         </div>
 
-        {/* Assets - Future */}
+        {/* Assets - Future (with liabilities inline) */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Assets — Future: {formatFull(futureAssets - liabilities)}</h3>
+          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">
+            Assets — Future: {formatFull(futureAssetsTotal - futureLiabilitiesTotal)}
+          </h3>
           <div className="space-y-2">
-            {futureAccounts.filter(a => a.kind === 'asset').map(acc => (
+            {futureAssetAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between text-xs">
                 <span className="text-gray-400">{acc.name}</span>
                 <span className="text-gray-200 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
               </div>
             ))}
           </div>
+          {futureLiabilityAccounts.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-800 space-y-2">
+              {futureLiabilityAccounts.map(acc => (
+                <div key={acc.id} className="flex justify-between text-xs">
+                  <span className="text-gray-500">{acc.name}</span>
+                  <span className="text-red-400 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
             Locked • long-term contributions reduce as you pay
           </div>
         </div>
 
-        {/* Liabilities */}
-        {liabilities > 0 && (
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-            <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Outstanding Contributions: {formatFull(-liabilities)}</h3>
-            <div className="space-y-2">
-              {futureAccounts.filter(a => a.kind === 'liability').map(acc => (
-                <div key={acc.id} className="flex justify-between text-xs">
-                  <span className="text-gray-400">{acc.name}</span>
-                  <span className="text-red-400 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Credit Cards */}
-      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Credit Cards</h3>
-        <div className="space-y-2">
-          {accounts
-            .filter(a => a.netWorthBucket === 'debt')
-            .map(acc => (
+        {/* Credit Cards */}
+        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Credit Cards: {formatFull(creditCardTotal)}</h3>
+          <div className="space-y-2">
+            {creditCardAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between text-xs">
                 <span className="text-gray-400">💳 {acc.name}</span>
-                <span className={acc.currentBalance < 0 ? 'text-red-400' : 'text-emerald-400'} style={{ fontFamily: 'monospace' }}>
+                <span className={acc.currentBalance < 0 ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>
                   {formatFull(acc.currentBalance, acc.currency)}
                 </span>
               </div>
             ))}
+          </div>
         </div>
       </div>
 
       {/* Monthly Flow Chart */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Monthly Flow</h3>
-        {monthlyFlowData.length > 0 && (
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={monthlyFlowData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="monthShort" stroke="#666" />
-              <YAxis stroke="#666" />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
-                formatter={(value) => formatShort(value)}
-              />
-              <Legend />
-              <Bar dataKey="real" fill="#10b981" name="Real Spending" />
-              <Bar dataKey="projected" fill="#8b5cf6" name="Projected" opacity={0.5} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        )}
+        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Monthly Flow — Last 12 Months</h3>
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={monthlyFlowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+            <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
+            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => formatShort(v)} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }}
+              formatter={(v, name) => [formatShort(v), name]}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Bar dataKey="expenses" fill="#ef4444" name="Expenses" opacity={0.85} />
+            <Bar dataKey="income" fill="#10b981" name="Income" opacity={0.85} />
+            <Line type="monotone" dataKey="savings" stroke="#f59e0b" strokeWidth={2} dot={false} name="Savings" />
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Wealth Trajectory Chart */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
         <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Wealth Trajectory</h3>
-        {wealthData.length > 0 && (
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={wealthData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="monthShort" stroke="#666" />
-              <YAxis stroke="#666" />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
-                formatter={(value) => formatShort(value)}
-              />
-              <Legend />
-              <Area type="monotone" dataKey="capital" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" opacity={0.6} name="Capital" />
-              <Area type="monotone" dataKey="usable" stackId="1" stroke="#10b981" fill="#10b981" opacity={0.6} name="Assets Usable" />
-              <Area type="monotone" dataKey="future" stackId="1" stroke="#f59e0b" fill="#f59e0b" opacity={0.6} name="Assets Future" />
-              <Line type="monotone" dataKey="netWorth" stroke="#06b6d4" strokeWidth={2} name="Net Worth" isAnimationActive={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={wealthData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+            <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
+            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => formatShort(v)} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }}
+              formatter={(v, name) => [formatShort(v), name]}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area type="monotone" dataKey="Capital" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.5} />
+            <Area type="monotone" dataKey="Usable" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.5} />
+            <Area type="monotone" dataKey="Future" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.5} />
+            <Line type="monotone" dataKey="NetWorth" stroke="#06b6d4" strokeWidth={2} dot={false} name="Net Worth" />
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Spending Detail */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Spending Detail</h3>
-        <div className="space-y-3">
-          {spendingData.map(item => {
-            const pct = item.budget > 0 ? (item.spent / item.budget) * 100 : 0;
-            const color = pct > 85 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-sm font-bold uppercase text-gray-300">Spending Detail</h3>
+          {/* Month navigator */}
+          <div className="flex items-center gap-2">
+            <button onClick={prevMonth} className="px-2 py-1 text-gray-400 hover:text-white text-sm border border-neutral-700 rounded">‹</button>
+            <span className="text-xs font-semibold text-gray-300 w-16 text-center">{getMonthLabel(viewYear, viewMonth)}</span>
+            <button
+              onClick={nextMonth}
+              disabled={isCurrentMonth}
+              className="px-2 py-1 text-gray-400 hover:text-white text-sm border border-neutral-700 rounded disabled:opacity-30"
+            >›</button>
+          </div>
+        </div>
 
-            return (
-              <div key={item.category}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-medium text-gray-300">
-                    {getCategoryEmoji(item.category)} {item.category}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {formatShort(item.spent)} / {formatShort(item.budget)} {Math.round(pct)}%
-                  </span>
+        {/* Summary row */}
+        <div className="flex gap-6 mb-6 pb-4 border-b border-gray-800">
+          <div>
+            <div className="text-xs text-gray-500 mb-1">INCOME</div>
+            <div className="text-lg font-bold text-emerald-400">
+              {formatFull(transactions.filter(t => {
+                const d = new Date(t.date);
+                return t.type === 'income' && d.getMonth() === viewMonth - 1 && d.getFullYear() === viewYear;
+              }).reduce((s, t) => s + toAED(t.amount, t.currency), 0))}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 mb-1">EXPENSES</div>
+            <div className="text-lg font-bold text-white">{formatFull(monthlySpending)}</div>
+          </div>
+          {totalBudget > 0 && (
+            <div>
+              <div className="text-xs text-gray-500 mb-1">BUDGET</div>
+              <div className="text-lg font-bold text-gray-300">{formatFull(totalBudget)}</div>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          {spendingData.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-4">No spending data for {getMonthLabel(viewYear, viewMonth)}</p>
+          ) : (
+            spendingData.map(item => {
+              const pct = item.budget > 0 ? (item.spent / item.budget) * 100 : 0;
+              const barWidth = item.budget > 0 ? Math.min(pct, 100) : (item.spent / maxSpent) * 100;
+              const barColor = pct > 100 ? '#ef4444' : pct > 75 ? '#f59e0b' : getCategoryColor(item.category);
+              return (
+                <div key={item.category}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-gray-300">
+                      {getCategoryEmoji(item.category)} {item.category}
+                    </span>
+                    <span className="text-xs text-gray-400 font-mono">
+                      {formatShort(item.spent)}
+                      {item.budget > 0 && <span className="text-gray-600"> / {formatShort(item.budget)} · {Math.round(pct)}%</span>}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-800 rounded-full h-2">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${barWidth}%`, backgroundColor: barColor }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-                  <div className={`h-full transition-all ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 
       {/* Budget Overview Table */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300">Budget Overview</h3>
-          <button
-            onClick={() => setEditingBudgets(!editingBudgets)}
-            className="text-xs px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded"
-          >
-            {editingBudgets ? 'Done' : 'Edit'}
-          </button>
-        </div>
+        <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Budget Overview — {getMonthLabel(viewYear, viewMonth)}</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-800">
-                <th className="text-left py-2 px-2 text-gray-400">Category</th>
-                <th className="text-right py-2 px-2 text-gray-400">Budget</th>
-                <th className="text-right py-2 px-2 text-gray-400">Spent</th>
-                <th className="text-right py-2 px-2 text-gray-400">Remaining</th>
-                <th className="text-right py-2 px-2 text-gray-400">%</th>
+                <th className="text-left py-2 px-2 text-gray-500 font-medium">Category</th>
+                <th className="text-right py-2 px-2 text-gray-500 font-medium">Budget</th>
+                <th className="text-right py-2 px-2 text-gray-500 font-medium">Spent</th>
+                <th className="text-right py-2 px-2 text-gray-500 font-medium">Left</th>
+                <th className="text-right py-2 px-2 text-gray-500 font-medium">%</th>
               </tr>
             </thead>
             <tbody>
               {CATEGORIES.map(cat => {
                 const budget = budgetMap[cat] || 0;
                 const spent = spendingByCategory[cat] || 0;
+                if (budget === 0 && spent === 0) return null;
                 const remaining = budget - spent;
-                const pct = budget > 0 ? (spent / budget) * 100 : 0;
-
+                const pct = budget > 0 ? (spent / budget) * 100 : null;
                 return (
                   <tr key={cat} className="border-b border-gray-900 hover:bg-gray-900/30">
-                    <td className="py-2 px-2">{getCategoryEmoji(cat)} {cat}</td>
-                    <td className="text-right py-2 px-2 font-mono">{formatShort(budget)}</td>
-                    <td className="text-right py-2 px-2 font-mono text-gray-400">{formatShort(spent)}</td>
+                    <td className="py-2 px-2 text-gray-300">{getCategoryEmoji(cat)} {cat}</td>
+                    <td className="text-right py-2 px-2 font-mono text-gray-400">{budget > 0 ? formatShort(budget) : '—'}</td>
+                    <td className="text-right py-2 px-2 font-mono text-white">{formatShort(spent)}</td>
                     <td className={`text-right py-2 px-2 font-mono ${remaining >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {formatShort(remaining)}
+                      {budget > 0 ? formatShort(remaining) : '—'}
                     </td>
-                    <td className="text-right py-2 px-2 text-gray-400">{Math.round(pct)}%</td>
+                    <td className="text-right py-2 px-2 text-gray-400">{pct != null ? `${Math.round(pct)}%` : '—'}</td>
                   </tr>
                 );
               })}
@@ -420,34 +486,29 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
         <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Recent Transactions</h3>
         <div className="overflow-x-auto">
-          <table>
+          <table className="w-full text-xs">
             <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th style={{ textAlign: 'right' }}>Amount</th>
+              <tr className="border-b border-gray-800">
+                <th className="text-left py-2 px-2 text-gray-500 font-medium">Date</th>
+                <th className="text-left py-2 px-2 text-gray-500 font-medium">Description</th>
+                <th className="text-left py-2 px-2 text-gray-500 font-medium">Category</th>
+                <th className="text-right py-2 px-2 text-gray-500 font-medium">Amount</th>
               </tr>
             </thead>
             <tbody>
               {recentTx.map(tx => (
-                <tr key={tx.id} className="clickable-row">
-                  <td className="text-gray-400 text-xs">{formatDate(tx.date)}</td>
-                  <td className="text-gray-200">{tx.description}</td>
-                  <td className="text-xs">
-                    <span className="inline-flex items-center gap-1">
-                      {getCategoryEmoji(tx.category)} {tx.category}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right' }} className="text-red-400 font-mono text-xs">
-                    - {formatFull(tx.amount, tx.currency)}
-                  </td>
+                <tr key={tx.id} className="border-b border-gray-900 hover:bg-gray-900/30">
+                  <td className="py-2 px-2 text-gray-400 font-mono">{formatDate(tx.date)}</td>
+                  <td className="py-2 px-2 text-gray-200">{tx.description}</td>
+                  <td className="py-2 px-2 text-gray-400">{getCategoryEmoji(tx.category)} {tx.category}</td>
+                  <td className="py-2 px-2 text-right text-red-400 font-mono">−{formatFull(tx.amount, tx.currency)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
     </div>
   );
 }
