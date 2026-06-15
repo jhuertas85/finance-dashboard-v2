@@ -52,13 +52,19 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const usableTotal = usableAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
   // Future assets
-  const futureAccounts = accounts.filter(a => a.netWorthBucket === 'future');
-  let futureAssets = 0, liabilities = 0;
-  futureAccounts.forEach(a => {
-    const aedBal = toAED(a.currentBalance, a.currency);
-    if (a.kind === 'asset') futureAssets += aedBal;
-    else liabilities += Math.abs(aedBal);
-  });
+  const futureAssetAccounts = accounts.filter(a => a.netWorthBucket === 'future' && a.kind === 'asset');
+  const futureAssetsTotal = futureAssetAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
+
+  // Future liabilities — catch both correctly-bucketed and Firestore-misclassified loan accounts
+  const futureLiabilityAccounts = accounts.filter(a =>
+    (a.netWorthBucket === 'future' && a.kind === 'liability') ||
+    (a.type === 'loan' && a.netWorthBucket === 'debt')
+  );
+  const futureLiabilitiesTotal = futureLiabilityAccounts.reduce((sum, a) => sum + Math.abs(toAED(a.currentBalance, a.currency)), 0);
+
+  // Credit cards — only actual credit card accounts
+  const creditCardAccounts = accounts.filter(a => a.netWorthBucket === 'debt' && a.type === 'credit');
+  const creditCardTotal = creditCardAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
   // Spending detail data
   const spendingData = CATEGORIES.map(cat => ({
@@ -66,6 +72,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     spent: spendingByCategory[cat] || 0,
     budget: budgetMap[cat] || 0,
   })).filter(d => d.spent > 0 || d.budget > 0);
+
+  const maxSpent = Math.max(...spendingData.map(d => d.spent), 1);
 
   // Monthly Flow data - last 12 months
   const monthlyFlowData = useMemo(() => {
@@ -119,10 +127,10 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       monthShort: new Date(monthKey + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
       capital: capitalTotal * (0.8 + idx * 0.02),
       usable: usableTotal * (0.9 + idx * 0.01),
-      future: (futureAssets - liabilities) * (0.85 + idx * 0.015),
+      future: (futureAssetsTotal - futureLiabilitiesTotal) * (0.85 + idx * 0.015),
       netWorth: netWorth.total * (0.85 + idx * 0.025)
     }));
-  }, [transactions, capitalTotal, usableTotal, futureAssets, liabilities, netWorth.total]);
+  }, [transactions, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, netWorth.total]);
 
   // Recurring bills
   const recurringBillsData = recurringBills.map(bill => ({
@@ -189,10 +197,17 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span>of {formatFull(totalBudget)} · {Math.round(spentPct)}% used</span>
             <span>Day {dayProgress.day}/{dayProgress.daysInMonth}</span>
           </div>
-          <div className="w-full bg-gray-800 rounded-full h-2 mt-2 overflow-hidden">
+          <div className="relative w-full bg-gray-800 rounded-full h-2 mt-2">
             <div
-              className={`h-full transition-all ${spentPct > 85 ? 'bg-red-500' : spentPct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-              style={{ width: `${Math.min(spentPct, 100)}%` }}
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${Math.min(spentPct, 100)}%`,
+                backgroundColor: spentPct > 85 ? '#ef4444' : spentPct > 50 ? '#f59e0b' : '#10b981'
+              }}
+            />
+            <div
+              className="absolute top-0 h-full w-px bg-white opacity-60"
+              style={{ left: `${Math.min(dayProgress.pct, 100)}%` }}
             />
           </div>
         </div>
@@ -252,50 +267,45 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* Assets - Future */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Assets — Future: {formatFull(futureAssets - liabilities)}</h3>
+          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Assets — Future: {formatFull(futureAssetsTotal - futureLiabilitiesTotal)}</h3>
           <div className="space-y-2">
-            {futureAccounts.filter(a => a.kind === 'asset').map(acc => (
+            {futureAssetAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between text-xs">
                 <span className="text-gray-400">{acc.name}</span>
                 <span className="text-gray-200 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
               </div>
             ))}
           </div>
+          {futureLiabilityAccounts.length > 0 && (
+            <>
+              <div className="border-t border-gray-800 mt-3 pt-3 space-y-2">
+                {futureLiabilityAccounts.map(acc => (
+                  <div key={acc.id} className="flex justify-between text-xs">
+                    <span className="text-gray-500">{acc.name}</span>
+                    <span className="text-red-400 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
             Locked • long-term contributions reduce as you pay
           </div>
         </div>
-
-        {/* Liabilities */}
-        {liabilities > 0 && (
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-            <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Outstanding Contributions: {formatFull(-liabilities)}</h3>
-            <div className="space-y-2">
-              {futureAccounts.filter(a => a.kind === 'liability').map(acc => (
-                <div key={acc.id} className="flex justify-between text-xs">
-                  <span className="text-gray-400">{acc.name}</span>
-                  <span className="text-red-400 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Credit Cards */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Credit Cards</h3>
+        <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Credit Cards: {formatFull(creditCardTotal)}</h3>
         <div className="space-y-2">
-          {accounts
-            .filter(a => a.netWorthBucket === 'debt')
-            .map(acc => (
-              <div key={acc.id} className="flex justify-between text-xs">
-                <span className="text-gray-400">💳 {acc.name}</span>
-                <span className={acc.currentBalance < 0 ? 'text-red-400' : 'text-emerald-400'} style={{ fontFamily: 'monospace' }}>
-                  {formatFull(acc.currentBalance, acc.currency)}
-                </span>
-              </div>
-            ))}
+          {creditCardAccounts.map(acc => (
+            <div key={acc.id} className="flex justify-between text-xs">
+              <span className="text-gray-400">💳 {acc.name}</span>
+              <span className={acc.currentBalance < 0 ? 'text-red-400' : 'text-emerald-400'} style={{ fontFamily: 'monospace' }}>
+                {formatFull(acc.currentBalance, acc.currency)}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -349,7 +359,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         <div className="space-y-3">
           {spendingData.map(item => {
             const pct = item.budget > 0 ? (item.spent / item.budget) * 100 : 0;
-            const color = pct > 85 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500';
+            const barWidth = item.budget > 0 ? Math.min(pct, 100) : (item.spent / maxSpent) * 100;
+            const barColor = pct > 100 ? '#ef4444' : pct > 75 ? '#f59e0b' : getCategoryColor(item.category);
 
             return (
               <div key={item.category}>
@@ -358,11 +369,11 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                     {getCategoryEmoji(item.category)} {item.category}
                   </span>
                   <span className="text-xs text-gray-400">
-                    {formatShort(item.spent)} / {formatShort(item.budget)} {Math.round(pct)}%
+                    {formatShort(item.spent)} / {item.budget > 0 ? formatShort(item.budget) : '—'} {item.budget > 0 ? `${Math.round(pct)}%` : ''}
                   </span>
                 </div>
                 <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-                  <div className={`h-full transition-all ${color}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                  <div className="h-full rounded-full transition-all" style={{ width: `${barWidth}%`, backgroundColor: barColor }} />
                 </div>
               </div>
             );
