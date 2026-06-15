@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0a0a0a;
+  color: #e5e7eb;
+  font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.card {
+  transition: all 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-1px);
+}
+
+.recharts-default-tooltip {
+  background: #141414 !important;
+  border: 1px solid #262626 !important;
+  border-radius: 8px !important;
+}
+
+.nav-tab {
+  transition: all 0.15s ease;
+}
+
+.nav-tab.active {
+  background: #10b981;
+  color: #fff;
+}
+
+.btn-primary {
+  background: #10b981;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover {
+  background: #059669;
+}
+
+.btn-primary:disabled {
+  background: #374151;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table thead {
+  position: sticky;
+  top: 0;
+  background: #0a0a0a;
+  z-index: 10;
+}
+
+table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 600;
+  border-bottom: 1px solid #262626;
+  cursor: pointer;
+  user-select: none;
+}
+
+table th:hover {
+  color: #10b981;
+}
+
+table td {
+  padding: 9px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.clickable-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}

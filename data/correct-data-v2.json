@@ -1,0 +1,519 @@
+{
+  "accounts": [
+    {
+      "id": "acc_mash_savings",
+      "name": "MASH Savings",
+      "type": "savings",
+      "currency": "AED",
+      "currentBalance": 469315.97,
+      "balanceMode": "calculated",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_nbd_savings",
+      "name": "NBD Savings",
+      "type": "savings",
+      "currency": "AED",
+      "currentBalance": 46255.15,
+      "balanceMode": "calculated",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_wio_eur",
+      "name": "WIO EUR",
+      "type": "investment",
+      "currency": "EUR",
+      "currentBalance": 6418.21,
+      "balanceMode": "manual",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_wio_aed",
+      "name": "WIO AED",
+      "type": "investment",
+      "currency": "AED",
+      "currentBalance": 20076.67,
+      "balanceMode": "calculated",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_bcp_sol",
+      "name": "BCP SOL",
+      "type": "investment",
+      "currency": "PEN",
+      "currentBalance": 14530.00,
+      "balanceMode": "manual",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_bcp_usd",
+      "name": "BCP USD",
+      "type": "bank",
+      "currency": "USD",
+      "currentBalance": 1302.59,
+      "balanceMode": "manual",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_cash_uae",
+      "name": "Cash UAE",
+      "type": "bank",
+      "currency": "AED",
+      "currentBalance": 1405.00,
+      "balanceMode": "calculated",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_wio_usd",
+      "name": "WIO USD",
+      "type": "investment",
+      "currency": "USD",
+      "currentBalance": 2.58,
+      "balanceMode": "manual",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_mash_current",
+      "name": "MASH Current",
+      "type": "bank",
+      "currency": "AED",
+      "currentBalance": 0,
+      "balanceMode": "calculated",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_nbd_current",
+      "name": "NBD Current",
+      "type": "bank",
+      "currency": "AED",
+      "currentBalance": 0,
+      "balanceMode": "calculated",
+      "netWorthBucket": "capital",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_talabat_equity",
+      "name": "DH Talabat Equity",
+      "type": "investment",
+      "currency": "USD",
+      "currentBalance": 35936.00,
+      "balanceMode": "calculated",
+      "netWorthBucket": "usable",
+      "kind": "asset",
+      "includeInNetWorth": true,
+      "holdings": [
+        {
+          "asset": "DHER",
+          "quantity": 1683,
+          "currentPrice": 21.39
+        },
+        {
+          "asset": "Talabat",
+          "quantity": 6250,
+          "currentPrice": 0.26
+        }
+      ]
+    },
+    {
+      "id": "acc_wio_investments",
+      "name": "WIO Investments",
+      "type": "investment",
+      "currency": "USD",
+      "currentBalance": 21951.00,
+      "balanceMode": "calculated",
+      "netWorthBucket": "usable",
+      "kind": "asset",
+      "includeInNetWorth": true,
+      "holdings": [
+        {
+          "asset": "AMD",
+          "quantity": 25.39630338,
+          "currentPrice": 516.10
+        },
+        {
+          "asset": "NVIDIA",
+          "quantity": 18.30418043,
+          "currentPrice": 211.14
+        },
+        {
+          "asset": "AMZN",
+          "quantity": 5.57886578,
+          "currentPrice": 270.64
+        },
+        {
+          "asset": "META",
+          "quantity": 1.698965513,
+          "currentPrice": 632.51
+        },
+        {
+          "asset": "CAKE",
+          "quantity": 11,
+          "currentPrice": 66.04
+        },
+        {
+          "asset": "SOFI",
+          "quantity": 18,
+          "currentPrice": 18.22
+        },
+        {
+          "asset": "NOW",
+          "quantity": 3.33337,
+          "currentPrice": 124.37
+        },
+        {
+          "asset": "SOL",
+          "quantity": 14.07285017,
+          "currentPrice": 84.71
+        },
+        {
+          "asset": "WIO Wealth",
+          "quantity": 1,
+          "currentPrice": 2178.92
+        }
+      ]
+    },
+    {
+      "id": "acc_binance_crypto",
+      "name": "Binance Crypto",
+      "type": "investment",
+      "currency": "USD",
+      "currentBalance": 5905.00,
+      "balanceMode": "calculated",
+      "netWorthBucket": "usable",
+      "kind": "asset",
+      "includeInNetWorth": true,
+      "holdings": [
+        {
+          "asset": "SOL",
+          "quantity": 39.87001318,
+          "currentPrice": 84.71
+        },
+        {
+          "asset": "ETH",
+          "quantity": 1.02971985,
+          "currentPrice": 2258.90
+        },
+        {
+          "asset": "SHIBA",
+          "quantity": 33630400.69,
+          "currentPrice": 0.00000596
+        }
+      ]
+    },
+    {
+      "id": "acc_peru_mapfre_retirement",
+      "name": "Peru MAPFRE Retirement",
+      "type": "investment",
+      "currency": "USD",
+      "currentBalance": 64000.00,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_peru_pacifico_vida_retirement",
+      "name": "Peru Pacifico Vida Retirement",
+      "type": "investment",
+      "currency": "USD",
+      "currentBalance": 63820.00,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_peru_land_asia",
+      "name": "Peru Land Asia",
+      "type": "investment",
+      "currency": "USD",
+      "currentBalance": 30000.00,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_peru_afp",
+      "name": "Peru AFP",
+      "type": "investment",
+      "currency": "PEN",
+      "currentBalance": 96893.12,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "acc_peru_pacifico_accidente_retirement",
+      "name": "Peru Pacifico Accidente Retirement",
+      "type": "investment",
+      "currency": "PEN",
+      "currentBalance": 16200.00,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "asset",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "debt_peru_pacifico_accidente",
+      "name": "Peru Pacifico Accidente Debt",
+      "type": "loan",
+      "currency": "PEN",
+      "currentBalance": -10844.96,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "liability",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "debt_peru_mapfre_2",
+      "name": "Peru MAPFRE 2 Debt",
+      "type": "loan",
+      "currency": "USD",
+      "currentBalance": -8400.65,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "liability",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "debt_peru_mapfre",
+      "name": "Peru MAPFRE Debt",
+      "type": "loan",
+      "currency": "USD",
+      "currentBalance": -30917.83,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "liability",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "debt_peru_pacifico_vida",
+      "name": "Peru Pacifico Vida Debt",
+      "type": "loan",
+      "currency": "USD",
+      "currentBalance": -43297.66,
+      "balanceMode": "manual",
+      "netWorthBucket": "future",
+      "kind": "liability",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "cc_talabat_credit",
+      "name": "Talabat Credit",
+      "type": "credit",
+      "currency": "AED",
+      "currentBalance": 0,
+      "balanceMode": "calculated",
+      "netWorthBucket": "debt",
+      "kind": "liability",
+      "includeInNetWorth": true
+    },
+    {
+      "id": "cc_nbd_credit",
+      "name": "NBD Credit",
+      "type": "credit",
+      "currency": "AED",
+      "currentBalance": -45.50,
+      "balanceMode": "calculated",
+      "netWorthBucket": "debt",
+      "kind": "liability",
+      "includeInNetWorth": true
+    }
+  ],
+  "transactions": [
+    {
+      "id": "txn_20260615_travel",
+      "date": "2026-06-15T00:00:00Z",
+      "description": "Travel expense",
+      "amount": 1717,
+      "type": "expense",
+      "category": "Travel",
+      "currency": "AED",
+      "fromAccount": "acc_mash_savings",
+      "toAccount": null,
+      "notes": ""
+    },
+    {
+      "id": "txn_20260610_food",
+      "date": "2026-06-10T00:00:00Z",
+      "description": "Groceries and food",
+      "amount": 1104,
+      "type": "expense",
+      "category": "Food & Groceries",
+      "currency": "AED",
+      "fromAccount": "acc_mash_savings",
+      "toAccount": null,
+      "notes": ""
+    },
+    {
+      "id": "txn_20260605_housing",
+      "date": "2026-06-05T00:00:00Z",
+      "description": "Housing",
+      "amount": 711,
+      "type": "expense",
+      "category": "Housing",
+      "currency": "AED",
+      "fromAccount": "acc_mash_savings",
+      "toAccount": null,
+      "notes": ""
+    },
+    {
+      "id": "txn_20260620_going_out",
+      "date": "2026-06-20T00:00:00Z",
+      "description": "Going out",
+      "amount": 935,
+      "type": "expense",
+      "category": "Going Out",
+      "currency": "AED",
+      "fromAccount": "acc_mash_savings",
+      "toAccount": null,
+      "notes": ""
+    },
+    {
+      "id": "txn_20260618_purchases",
+      "date": "2026-06-18T00:00:00Z",
+      "description": "Purchases",
+      "amount": 850,
+      "type": "expense",
+      "category": "Purchases",
+      "currency": "AED",
+      "fromAccount": "acc_mash_savings",
+      "toAccount": null,
+      "notes": ""
+    },
+    {
+      "id": "txn_20260625_investments",
+      "date": "2026-06-25T00:00:00Z",
+      "description": "Investment contribution",
+      "amount": 575,
+      "type": "expense",
+      "category": "Investments",
+      "currency": "AED",
+      "fromAccount": "acc_mash_savings",
+      "toAccount": null,
+      "notes": ""
+    },
+    {
+      "id": "txn_20260612_others",
+      "date": "2026-06-12T00:00:00Z",
+      "description": "Other expenses",
+      "amount": 5541,
+      "type": "expense",
+      "category": "Others",
+      "currency": "AED",
+      "fromAccount": "acc_mash_savings",
+      "toAccount": null,
+      "notes": ""
+    }
+  ],
+  "budgets": [
+    {
+      "id": "budget_travel",
+      "category": "Travel",
+      "monthlyLimit": 5000,
+      "year": 2026,
+      "month": 6
+    },
+    {
+      "id": "budget_food",
+      "category": "Food & Groceries",
+      "monthlyLimit": 2000,
+      "year": 2026,
+      "month": 6
+    },
+    {
+      "id": "budget_housing",
+      "category": "Housing",
+      "monthlyLimit": 1700,
+      "year": 2026,
+      "month": 6
+    },
+    {
+      "id": "budget_going_out",
+      "category": "Going Out",
+      "monthlyLimit": 5300,
+      "year": 2026,
+      "month": 6
+    },
+    {
+      "id": "budget_purchases",
+      "category": "Purchases",
+      "monthlyLimit": 5000,
+      "year": 2026,
+      "month": 6
+    },
+    {
+      "id": "budget_investments",
+      "category": "Investments",
+      "monthlyLimit": 6850,
+      "year": 2026,
+      "month": 6
+    },
+    {
+      "id": "budget_others",
+      "category": "Others",
+      "monthlyLimit": 80,
+      "year": 2026,
+      "month": 6
+    }
+  ],
+  "recurringBills": [
+    {
+      "id": "bill_netflix",
+      "name": "Netflix",
+      "amount": 50,
+      "currency": "AED",
+      "frequency": "monthly",
+      "dueDay": 15,
+      "category": "Subscriptions",
+      "active": true
+    },
+    {
+      "id": "bill_spotify",
+      "name": "Spotify",
+      "amount": 20,
+      "currency": "AED",
+      "frequency": "monthly",
+      "dueDay": 20,
+      "category": "Subscriptions",
+      "active": true
+    },
+    {
+      "id": "bill_youtube_premium",
+      "name": "YouTube Premium",
+      "amount": 25,
+      "currency": "AED",
+      "frequency": "monthly",
+      "dueDay": 10,
+      "category": "Subscriptions",
+      "active": true
+    }
+  ],
+  "currencyRates": {
+    "usdAed": 3.67,
+    "eurAed": 4.0,
+    "penAed": 0.95,
+    "timestamp": "2026-06-15T00:00:00Z"
+  }
+}
