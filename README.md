@@ -1,5 +1,7 @@
 # Finance Command Center — React + Firestore Version
 
+**Live Dashboard:** [https://financedashboardv2.vercel.app/](https://financedashboardv2.vercel.app/)
+
 Exact replica of the Finance Dashboard, rebuilt as a modern React + Vite application with Firestore as the backend.
 
 ## Architecture
