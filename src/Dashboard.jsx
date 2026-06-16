@@ -105,13 +105,14 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const monthlySpending = calcSpending(transactions, viewMonth, viewYear);
   const spendingByCategory = calcByCategory(transactions, viewMonth, viewYear);
 
-  // Budgets: load defaults (no month/year) first, then apply monthly overrides
+  // Budgets: docs with no month = default (applies to all months)
+  // docs with year+month = override for that specific month
   const budgetMap = {};
   budgets.forEach(b => {
-    if (!b.year && !b.month) budgetMap[b.category] = b.monthlyLimit;
+    if (!b.month) budgetMap[b.category] = b.monthlyLimit;
   });
   budgets.forEach(b => {
-    if (b.year && b.month && parseInt(b.year) === viewYear && parseInt(b.month) === viewMonth) {
+    if (b.month && parseInt(b.month) === viewMonth && parseInt(b.year) === viewYear) {
       budgetMap[b.category] = b.monthlyLimit;
     }
   });
