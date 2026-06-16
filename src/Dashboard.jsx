@@ -200,8 +200,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 15);
 
-  // Credit cards with outstanding balance
-  const cardsWithBalance = creditCardAccounts.filter(a => a.currentBalance < 0);
+  // Credit cards with pending unreconciled transactions
+  const cardsWithPending = creditCardAccounts.filter(acc =>
+    transactions.some(tx =>
+      (tx.fromAccount === acc.id || tx.fromAccount === acc.name) &&
+      tx.reconciled === false
+    )
+  );
 
   return (
     <div className="space-y-6 pb-12">
@@ -386,18 +391,24 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
               </div>
             ))}
           </div>
-          {cardsWithBalance.length > 0 && (
+          {cardsWithPending.length > 0 && (
             <div className="mt-4 space-y-2">
-              {cardsWithBalance.map(acc => (
-                <button
-                  key={acc.id}
-                  onClick={() => setPayingCard(acc)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition"
-                >
-                  <span>💳 Pay {acc.name}</span>
-                  <span>{fmt(Math.abs(toAED(acc.currentBalance, acc.currency)))} →</span>
-                </button>
-              ))}
+              {cardsWithPending.map(acc => {
+                const pendingCount = transactions.filter(tx =>
+                  (tx.fromAccount === acc.id || tx.fromAccount === acc.name) &&
+                  tx.reconciled === false
+                ).length;
+                return (
+                  <button
+                    key={acc.id}
+                    onClick={() => setPayingCard(acc)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition"
+                  >
+                    <span>💳 Pay {acc.name}</span>
+                    <span>{pendingCount} charge{pendingCount !== 1 ? 's' : ''} · {fmt(Math.abs(toAED(acc.currentBalance, acc.currency)))} →</span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

@@ -59,6 +59,10 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
     const acct = accounts.find(a => a.id === fromAccount);
     if (type !== 'income' && !acct) { setError('Select an account'); return; }
 
+    // Credit card expenses stay unreconciled until paid via Pay button
+    const isCreditCard = acct && acct.netWorthBucket === 'debt' && acct.name.toLowerCase().includes('credit');
+    const reconciled = !(type === 'expense' && isCreditCard);
+
     setSaving(true);
     setError('');
     try {
@@ -72,6 +76,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
         fromAccount: type === 'income' ? null : fromAccount,
         toAccount: type === 'income' ? fromAccount : (type === 'transfer' ? toAccount : null),
         notes: notes.trim(),
+        reconciled,
       });
 
       // Update account balances

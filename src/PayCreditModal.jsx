@@ -14,13 +14,12 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
   const outstandingNative = Math.abs(creditCard.currentBalance);
   const outstandingAED = toAED(outstandingNative, creditCard.currency);
 
-  // Linked pending transactions: expenses charged to this credit card
-  // Match by Firestore ID OR account name (imported data uses names)
-  // Status 'cc_pending' = not yet paid to the bank
+  // Linked pending transactions: expenses charged to this credit card not yet paid
+  // reconciled=false means pending payment; match by name (imported data) or ID
   const pendingTxs = transactions
     .filter(tx =>
       (tx.fromAccount === creditCard.id || tx.fromAccount === creditCard.name) &&
-      tx.status === 'cc_pending'
+      tx.reconciled === false
     )
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -62,10 +61,10 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
       const payFromAccount = accounts.find(a => a.id === payFromId);
       const batch = writeBatch(db);
 
-      // Mark selected transactions as paid
+      // Mark selected transactions as reconciled (paid off)
       if (hasLinkedTxs) {
         selectedTxs.forEach(tx => {
-          batch.update(doc(db, 'transactions', tx.id), { status: 'paid' });
+          batch.update(doc(db, 'transactions', tx.id), { reconciled: true });
         });
       }
 
