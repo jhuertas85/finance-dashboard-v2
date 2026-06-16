@@ -5,10 +5,21 @@ import { toAED } from './utils.js';
 
 const FX = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
 
+function fmt2(amount, currency = 'AED') {
+  return `${currency} ${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export default function PayCreditModal({ creditCard, accounts, transactions, onClose }) {
+  // Outstanding balance in native currency (positive = what you owe)
+  const outstandingNative = Math.abs(creditCard.currentBalance);
+  const outstandingAED = toAED(outstandingNative, creditCard.currency);
+
+  // Linked pending transactions: expenses charged TO this credit card
   const pendingTxs = transactions
     .filter(tx => tx.fromAccount === creditCard.id && !tx.paid)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const hasLinkedTxs = pendingTxs.length > 0;
 
   const [selected, setSelected] = useState(new Set(pendingTxs.map(t => t.id)));
   const [payFromId, setPayFromId] = useState('');
@@ -21,7 +32,10 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
   );
 
   const selectedTxs = pendingTxs.filter(t => selected.has(t.id));
-  const totalAED = selectedTxs.reduce((sum, tx) => sum + toAED(tx.amount, tx.currency), 0);
+  // Amount to pay: sum of selected txs if linked txs exist, otherwise full outstanding balance
+  const payAmountAED = hasLinkedTxs
+    ? selectedTxs.reduce((sum, tx) => sum + toAED(tx.amount, tx.currency), 0)
+    : outstandingAED;
 
   function toggleTx(id) {
     setSelected(prev => {
@@ -36,38 +50,42 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
   }
 
   async function pay() {
-    if (!payFromId || selectedTxs.length === 0 || totalAED === 0) return;
+    if (!payFromId || payAmountAED <= 0) return;
     setSaving(true);
     setError('');
     try {
       const payFromAccount = accounts.find(a => a.id === payFromId);
       const batch = writeBatch(db);
 
-      // Mark selected transactions as paid
-      selectedTxs.forEach(tx => {
-        batch.update(doc(db, 'transactions', tx.id), { paid: true });
-      });
+      // Mark selected transactions as paid (only if linked txs flow)
+      if (hasLinkedTxs) {
+        selectedTxs.forEach(tx => {
+          batch.update(doc(db, 'transactions', tx.id), { paid: true });
+        });
+      }
 
       // Create transfer transaction record
       const newTxRef = doc(collection(db, 'transactions'));
       batch.set(newTxRef, {
         date: new Date().toISOString(),
         description: `Credit card payment — ${creditCard.name}`,
-        amount: totalAED / (FX[creditCard.currency] || 1),
+        amount: payAmountAED / (FX[creditCard.currency] || 1),
         type: 'transfer',
         category: 'Transfer',
         currency: creditCard.currency,
         fromAccount: payFromId,
         toAccount: creditCard.id,
-        notes: `Payment for ${selectedTxs.length} transaction(s)`,
+        notes: hasLinkedTxs
+          ? `Payment for ${selectedTxs.length} transaction(s)`
+          : 'Outstanding balance payment',
       });
 
-      // Update payment account balance (deduct amount)
-      const payFromNewBal = payFromAccount.currentBalance - (totalAED / (FX[payFromAccount.currency] || 1));
+      // Deduct from payment account
+      const payFromNewBal = payFromAccount.currentBalance - (payAmountAED / (FX[payFromAccount.currency] || 1));
       batch.update(doc(db, 'accounts', payFromId), { currentBalance: payFromNewBal });
 
-      // Update credit card balance (add back — makes it less negative toward 0)
-      const cardNewBal = creditCard.currentBalance + (totalAED / (FX[creditCard.currency] || 1));
+      // Update credit card balance toward 0
+      const cardNewBal = creditCard.currentBalance + (payAmountAED / (FX[creditCard.currency] || 1));
       batch.update(doc(db, 'accounts', creditCard.id), { currentBalance: cardNewBal });
 
       await batch.commit();
@@ -78,11 +96,12 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
     setSaving(false);
   }
 
-  const totalDisplay = `AED ${totalAED.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const canPay = payFromId && payAmountAED > 0 && (!hasLinkedTxs || selectedTxs.length > 0);
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+
         <div className="flex items-center justify-between p-4 border-b border-neutral-800">
           <h2 className="text-white font-bold">💳 Pay {creditCard.name}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-lg">✕</button>
@@ -92,22 +111,38 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
           <div className="p-8 text-center">
             <div className="text-5xl mb-3">✅</div>
             <p className="text-emerald-400 font-semibold">Payment applied!</p>
-            <p className="text-gray-500 text-sm mt-1">{selectedTxs.length} transaction{selectedTxs.length !== 1 ? 's' : ''} marked as paid</p>
+            <p className="text-gray-500 text-sm mt-1">
+              {hasLinkedTxs
+                ? `${selectedTxs.length} transaction${selectedTxs.length !== 1 ? 's' : ''} marked as paid`
+                : 'Outstanding balance cleared'}
+            </p>
             <button onClick={onClose} className="mt-4 px-6 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold">Close</button>
           </div>
         ) : (
           <>
+            {/* Outstanding balance summary — always visible */}
+            <div className="px-4 pt-4">
+              <div className="bg-neutral-800 rounded-xl px-4 py-3 flex justify-between items-center">
+                <span className="text-xs text-gray-500 uppercase font-bold">Outstanding balance</span>
+                <span className="text-red-400 font-bold text-lg">{fmt2(outstandingNative, creditCard.currency)}</span>
+              </div>
+            </div>
+
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {pendingTxs.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-3">✓</div>
-                  <p className="text-emerald-400 font-semibold">No pending transactions</p>
-                  <p className="text-gray-500 text-sm mt-1">{creditCard.name} has no unpaid charges</p>
+              {!hasLinkedTxs ? (
+                /* No individual transactions tracked — direct balance payment */
+                <div className="bg-neutral-800/50 border border-neutral-700 rounded-xl p-4 text-sm text-gray-400">
+                  <p className="font-medium text-gray-300 mb-1">No individual charges tracked</p>
+                  <p className="text-xs">
+                    This balance was set directly. Paying will transfer the full outstanding amount
+                    from your chosen account and bring {creditCard.name} to zero.
+                  </p>
                 </div>
               ) : (
+                /* Linked transactions found — show with checkboxes */
                 <>
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs text-gray-500 uppercase font-bold">{pendingTxs.length} pending</span>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-gray-500 uppercase font-bold">{pendingTxs.length} pending charge{pendingTxs.length !== 1 ? 's' : ''}</span>
                     <button onClick={toggleAll} className="text-xs text-emerald-400 hover:text-emerald-300">
                       {selected.size === pendingTxs.length ? 'Deselect all' : 'Select all'}
                     </button>
@@ -130,7 +165,7 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
                         </p>
                       </div>
                       <span className="text-red-400 text-sm font-mono shrink-0">
-                        {tx.currency} {Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {fmt2(tx.amount, tx.currency)}
                       </span>
                     </label>
                   ))}
@@ -138,40 +173,41 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
               )}
             </div>
 
-            {pendingTxs.length > 0 && (
-              <div className="p-4 border-t border-neutral-800 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-400">{selectedTxs.length} selected</span>
-                  <span className="text-white font-bold">{totalDisplay}</span>
+            {/* Payment footer — always visible */}
+            <div className="p-4 border-t border-neutral-800 space-y-3">
+              {hasLinkedTxs && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-400">{selectedTxs.length} selected</span>
+                  <span className="text-white font-bold">{fmt2(payAmountAED, 'AED')}</span>
                 </div>
+              )}
 
-                <div>
-                  <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Pay from account</label>
-                  <select
-                    value={payFromId}
-                    onChange={e => setPayFromId(e.target.value)}
-                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm"
-                  >
-                    <option value="">— Select account —</option>
-                    {payableAccounts.map(a => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.currency} {Number(a.currentBalance).toLocaleString(undefined, { maximumFractionDigits: 0 })})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {error && <p className="text-red-400 text-xs">{error}</p>}
-
-                <button
-                  onClick={pay}
-                  disabled={saving || !payFromId || selectedTxs.length === 0}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold disabled:opacity-40 transition"
+              <div>
+                <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Pay from account</label>
+                <select
+                  value={payFromId}
+                  onChange={e => setPayFromId(e.target.value)}
+                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm"
                 >
-                  {saving ? 'Processing…' : `Pay ${totalDisplay} →`}
-                </button>
+                  <option value="">— Select account —</option>
+                  {payableAccounts.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.currency} {Number(a.currentBalance).toLocaleString(undefined, { maximumFractionDigits: 0 })})
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
+
+              {error && <p className="text-red-400 text-xs">{error}</p>}
+
+              <button
+                onClick={pay}
+                disabled={saving || !canPay}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold disabled:opacity-40 transition"
+              >
+                {saving ? 'Processing…' : `Pay ${fmt2(payAmountAED, 'AED')} →`}
+              </button>
+            </div>
           </>
         )}
       </div>
