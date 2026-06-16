@@ -14,9 +14,14 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
   const outstandingNative = Math.abs(creditCard.currentBalance);
   const outstandingAED = toAED(outstandingNative, creditCard.currency);
 
-  // Linked pending transactions: expenses charged TO this credit card
+  // Linked pending transactions: expenses charged to this credit card
+  // Match by Firestore ID OR account name (imported data uses names)
+  // Status 'cc_pending' = not yet paid to the bank
   const pendingTxs = transactions
-    .filter(tx => tx.fromAccount === creditCard.id && !tx.paid)
+    .filter(tx =>
+      (tx.fromAccount === creditCard.id || tx.fromAccount === creditCard.name) &&
+      tx.status === 'cc_pending'
+    )
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const hasLinkedTxs = pendingTxs.length > 0;
@@ -57,10 +62,10 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
       const payFromAccount = accounts.find(a => a.id === payFromId);
       const batch = writeBatch(db);
 
-      // Mark selected transactions as paid (only if linked txs flow)
+      // Mark selected transactions as paid
       if (hasLinkedTxs) {
         selectedTxs.forEach(tx => {
-          batch.update(doc(db, 'transactions', tx.id), { paid: true });
+          batch.update(doc(db, 'transactions', tx.id), { status: 'paid' });
         });
       }
 
