@@ -39,7 +39,7 @@ function calcByCategory(transactions, month, year) {
   return out;
 }
 
-export default function Dashboard({ accounts, transactions, budgets, recurringBills = [] }) {
+export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED' }) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
@@ -56,6 +56,23 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); }
     else setViewMonth(m => m + 1);
   }
+
+  // Currency display helpers — all internal values are in AED
+  const FX_DISPLAY = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
+  const displayRate = FX_DISPLAY[selectedCurrency] || 1;
+  const fmt = (aed) => {
+    if (aed == null || isNaN(aed)) return '—';
+    return `${selectedCurrency} ${Math.round(aed / displayRate).toLocaleString()}`;
+  };
+  const fmtS = (aed) => {
+    if (aed == null || isNaN(aed)) return '—';
+    const v = aed / displayRate;
+    const abs = Math.abs(v);
+    if (abs >= 1e6) return (v < 0 ? '-' : '') + (abs / 1e6).toFixed(1) + 'M';
+    if (abs >= 1e3) return (v < 0 ? '-' : '') + (abs / 1e3).toFixed(1) + 'K';
+    return (v < 0 ? '-' : '') + Math.round(abs);
+  };
+  const fmtAcc = (balance, currency) => fmt(toAED(balance, currency));
 
   const netWorth = calculateNetWorth(accounts);
 
@@ -88,10 +105,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const monthlySpending = calcSpending(transactions, viewMonth, viewYear);
   const spendingByCategory = calcByCategory(transactions, viewMonth, viewYear);
 
-  // Budgets for selected month — parseInt guards against Firestore string types
+  // Budgets: load defaults (no month/year) first, then apply monthly overrides
   const budgetMap = {};
   budgets.forEach(b => {
-    if (parseInt(b.year) === viewYear && parseInt(b.month) === viewMonth) {
+    if (!b.year && !b.month) budgetMap[b.category] = b.monthlyLimit;
+  });
+  budgets.forEach(b => {
+    if (b.year && b.month && parseInt(b.year) === viewYear && parseInt(b.month) === viewMonth) {
       budgetMap[b.category] = b.monthlyLimit;
     }
   });
@@ -196,8 +216,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className="text-xs font-bold uppercase text-gray-500">NET WORTH</span>
             <span className="text-lg">💎</span>
           </div>
-          <div className="text-3xl font-bold text-white mb-1">{formatShort(netWorth.total)}</div>
-          <div className="text-xs text-emerald-400">+7.9% (88.3K) vs last month</div>
+          <div className="text-3xl font-bold text-white mb-1">{fmt(netWorth.total)}</div>
+          <div className="text-xs text-emerald-400">+7.9% ({fmtS(netWorth.total * 0.079)}) vs last month</div>
         </div>
 
         {/* SPENT THIS MONTH */}
@@ -206,10 +226,10 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className="text-xs font-bold uppercase text-gray-500">SPENT THIS MONTH</span>
             <span className="text-lg">💸</span>
           </div>
-          <div className="text-3xl font-bold text-white mb-1">{formatFull(monthlySpending)}</div>
+          <div className="text-3xl font-bold text-white mb-1">{fmt(monthlySpending)}</div>
           <div className="flex items-center justify-between text-xs text-gray-500 mt-3">
             <span>
-              of {totalBudget > 0 ? formatFull(totalBudget) : '—'} · {totalBudget > 0 ? `${Math.round(spentPct)}% used` : 'no budget set'}
+              of {totalBudget > 0 ? fmt(totalBudget) : '—'} · {totalBudget > 0 ? `${Math.round(spentPct)}% used` : 'no budget set'}
             </span>
             <span>Day {dayProgress.day}/{dayProgress.daysInMonth}</span>
           </div>
@@ -243,11 +263,11 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className="text-xs font-bold uppercase text-gray-500">ANNUAL SAVINGS TRACKER</span>
             <span className="text-lg">📅</span>
           </div>
-          <div className="text-3xl font-bold text-white mb-1">{formatFull(annualSavings)}</div>
+          <div className="text-3xl font-bold text-white mb-1">{fmt(annualSavings)}</div>
           <div className="text-xs text-gray-500">Jan–May real savings</div>
           <div className="flex items-center justify-between text-xs text-gray-500 mt-3">
             <span>Projected year-end</span>
-            <span className="text-emerald-400">{formatFull(230171)}</span>
+            <span className="text-emerald-400">{fmt(230171)}</span>
           </div>
           <div className="relative w-full bg-gray-800 rounded-full h-2 mt-2">
             <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(5 / 12) * 100}%` }} />
@@ -262,12 +282,12 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* Capital */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Capital: {formatFull(capitalTotal)}</h3>
+          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Capital: {fmt(capitalTotal)}</h3>
           <div className="space-y-2">
             {capitalAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between text-xs">
                 <span className="text-gray-400">{acc.name}</span>
-                <span className="text-gray-200 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
+                <span className="text-gray-200 font-mono">{fmtAcc(acc.currentBalance, acc.currency)}</span>
               </div>
             ))}
           </div>
@@ -276,12 +296,12 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* Assets - Usable */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Assets — Usable: {formatFull(usableTotal)}</h3>
+          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Assets — Usable: {fmt(usableTotal)}</h3>
           <div className="space-y-2">
             {usableAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between text-xs">
                 <span className="text-gray-400">{acc.name}</span>
-                <span className="text-gray-200 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
+                <span className="text-gray-200 font-mono">{fmtAcc(acc.currentBalance, acc.currency)}</span>
               </div>
             ))}
           </div>
@@ -291,13 +311,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         {/* Assets - Future (with liabilities inline) */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
           <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">
-            Assets — Future: {formatFull(futureAssetsTotal - futureLiabilitiesTotal)}
+            Assets — Future: {fmt(futureAssetsTotal - futureLiabilitiesTotal)}
           </h3>
           <div className="space-y-2">
             {futureAssetAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between text-xs">
                 <span className="text-gray-400">{acc.name}</span>
-                <span className="text-gray-200 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
+                <span className="text-gray-200 font-mono">{fmtAcc(acc.currentBalance, acc.currency)}</span>
               </div>
             ))}
           </div>
@@ -306,7 +326,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
               {futureLiabilityAccounts.map(acc => (
                 <div key={acc.id} className="flex justify-between text-xs">
                   <span className="text-gray-500">{acc.name}</span>
-                  <span className="text-red-400 font-mono">{formatFull(acc.currentBalance, acc.currency)}</span>
+                  <span className="text-red-400 font-mono">{fmtAcc(acc.currentBalance, acc.currency)}</span>
                 </div>
               ))}
             </div>
@@ -318,13 +338,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* Credit Cards */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Credit Cards: {formatFull(creditCardTotal)}</h3>
+          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Credit Cards: {fmt(creditCardTotal)}</h3>
           <div className="space-y-2">
             {creditCardAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between text-xs">
                 <span className="text-gray-400">💳 {acc.name}</span>
                 <span className={acc.currentBalance < 0 ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>
-                  {formatFull(acc.currentBalance, acc.currency)}
+                  {fmtAcc(acc.currentBalance, acc.currency)}
                 </span>
               </div>
             ))}
@@ -339,10 +359,10 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           <ComposedChart data={monthlyFlowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => formatShort(v)} />
+            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
             <Tooltip
               contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }}
-              formatter={(v, name) => [formatShort(v), name]}
+              formatter={(v, name) => [fmtS(v), name]}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="expenses" fill="#ef4444" name="Expenses" opacity={0.85} />
@@ -359,10 +379,10 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           <ComposedChart data={wealthData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => formatShort(v)} />
+            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
             <Tooltip
               contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }}
-              formatter={(v, name) => [formatShort(v), name]}
+              formatter={(v, name) => [fmtS(v), name]}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Area type="monotone" dataKey="Capital" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.5} />
@@ -394,7 +414,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           <div>
             <div className="text-xs text-gray-500 mb-1">INCOME</div>
             <div className="text-lg font-bold text-emerald-400">
-              {formatFull(transactions.filter(t => {
+              {fmt(transactions.filter(t => {
                 const d = new Date(t.date);
                 return t.type === 'income' && d.getMonth() === viewMonth - 1 && d.getFullYear() === viewYear;
               }).reduce((s, t) => s + toAED(t.amount, t.currency), 0))}
@@ -402,12 +422,12 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           </div>
           <div>
             <div className="text-xs text-gray-500 mb-1">EXPENSES</div>
-            <div className="text-lg font-bold text-white">{formatFull(monthlySpending)}</div>
+            <div className="text-lg font-bold text-white">{fmt(monthlySpending)}</div>
           </div>
           {totalBudget > 0 && (
             <div>
               <div className="text-xs text-gray-500 mb-1">BUDGET</div>
-              <div className="text-lg font-bold text-gray-300">{formatFull(totalBudget)}</div>
+              <div className="text-lg font-bold text-gray-300">{fmt(totalBudget)}</div>
             </div>
           )}
         </div>
@@ -427,8 +447,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                       {getCategoryEmoji(item.category)} {item.category}
                     </span>
                     <span className="text-xs text-gray-400 font-mono">
-                      {formatShort(item.spent)}
-                      {item.budget > 0 && <span className="text-gray-600"> / {formatShort(item.budget)} · {Math.round(pct)}%</span>}
+                      {fmtS(item.spent)}
+                      {item.budget > 0 && <span className="text-gray-600"> / {fmtS(item.budget)} · {Math.round(pct)}%</span>}
                     </span>
                   </div>
                   <div className="w-full bg-gray-800 rounded-full h-2">
@@ -468,10 +488,10 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                 return (
                   <tr key={cat} className="border-b border-gray-900 hover:bg-gray-900/30">
                     <td className="py-2 px-2 text-gray-300">{getCategoryEmoji(cat)} {cat}</td>
-                    <td className="text-right py-2 px-2 font-mono text-gray-400">{budget > 0 ? formatShort(budget) : '—'}</td>
-                    <td className="text-right py-2 px-2 font-mono text-white">{formatShort(spent)}</td>
+                    <td className="text-right py-2 px-2 font-mono text-gray-400">{budget > 0 ? fmtS(budget) : '—'}</td>
+                    <td className="text-right py-2 px-2 font-mono text-white">{fmtS(spent)}</td>
                     <td className={`text-right py-2 px-2 font-mono ${remaining >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {budget > 0 ? formatShort(remaining) : '—'}
+                      {budget > 0 ? (remaining >= 0 ? fmtS(remaining) : '-' + fmtS(Math.abs(remaining))) : '—'}
                     </td>
                     <td className="text-right py-2 px-2 text-gray-400">{pct != null ? `${Math.round(pct)}%` : '—'}</td>
                   </tr>
@@ -501,7 +521,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                   <td className="py-2 px-2 text-gray-400 font-mono">{formatDate(tx.date)}</td>
                   <td className="py-2 px-2 text-gray-200">{tx.description}</td>
                   <td className="py-2 px-2 text-gray-400">{getCategoryEmoji(tx.category)} {tx.category}</td>
-                  <td className="py-2 px-2 text-right text-red-400 font-mono">−{formatFull(tx.amount, tx.currency)}</td>
+                  <td className="py-2 px-2 text-right text-red-400 font-mono">−{fmtAcc(tx.amount, tx.currency)}</td>
                 </tr>
               ))}
             </tbody>

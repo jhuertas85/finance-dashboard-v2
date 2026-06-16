@@ -3,13 +3,14 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import Dashboard from './Dashboard.jsx';
 import Transactions from './Transactions.jsx';
+import AddTransactionModal from './AddTransactionModal.jsx';
+import ReconcileModal from './ReconcileModal.jsx';
 
+const CURRENCIES = ['AED', 'USD', 'EUR', 'PEN'];
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'transactions', label: 'Transactions', icon: '📋' },
 ];
-
-const CURRENCIES = ['AED', 'USD', 'EUR', 'PEN'];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -20,81 +21,66 @@ export default function App() {
   const [selectedCurrency, setSelectedCurrency] = useState('AED');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showAddTx, setShowAddTx] = useState(false);
+  const [showReconcile, setShowReconcile] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Date/time info for header
+  const now = new Date();
+  const monthLabel = now.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  const day = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const timeLabel = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
   useEffect(() => {
-    const unsubscribe = loadData();
-    return unsubscribe;
+    const unsub = setupListeners();
+    return unsub;
   }, []);
 
-  const loadData = () => {
+  function setupListeners() {
     setLoading(true);
     setError('');
+    let loaded = { accounts: false, tx: false, budgets: false, bills: false };
 
-    let loadedAccounts = false, loadedTx = false, loadedBudgets = false, loadedBills = false;
+    function checkDone() {
+      if (Object.values(loaded).every(Boolean)) setLoading(false);
+    }
 
-    // Real-time listeners for instant updates
-    const unsubscribeAccounts = onSnapshot(collection(db, 'accounts'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAccounts(data);
-      loadedAccounts = true;
-      console.log('Accounts loaded:', data.length);
-      if (loadedAccounts && loadedTx && loadedBudgets && loadedBills) setLoading(false);
-    }, (err) => {
-      console.error('Error loading accounts:', err);
-      setError(err.message);
-      setLoading(false);
-    });
+    const unsubAccounts = onSnapshot(collection(db, 'accounts'), snap => {
+      setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      loaded.accounts = true; checkDone();
+    }, err => { setError(err.message); setLoading(false); });
 
-    const unsubscribeTx = onSnapshot(collection(db, 'transactions'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTransactions(data);
-      loadedTx = true;
-      console.log('Transactions loaded:', data.length);
-      if (loadedAccounts && loadedTx && loadedBudgets && loadedBills) setLoading(false);
-    }, (err) => {
-      console.error('Error loading transactions:', err);
-      setError(err.message);
-      setLoading(false);
-    });
+    const unsubTx = onSnapshot(collection(db, 'transactions'), snap => {
+      setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      loaded.tx = true; checkDone();
+    }, err => { setError(err.message); setLoading(false); });
 
-    const unsubscribeBudgets = onSnapshot(collection(db, 'budgets'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setBudgets(data);
-      loadedBudgets = true;
-      console.log('Budgets loaded:', data.length);
-      if (loadedAccounts && loadedTx && loadedBudgets && loadedBills) setLoading(false);
-    }, (err) => {
-      console.error('Error loading budgets:', err);
-      setError(err.message);
-      setLoading(false);
-    });
+    const unsubBudgets = onSnapshot(collection(db, 'budgets'), snap => {
+      setBudgets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      loaded.budgets = true; checkDone();
+    }, err => { setError(err.message); setLoading(false); });
 
-    const unsubscribeBills = onSnapshot(collection(db, 'recurringBills'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setRecurringBills(data);
-      loadedBills = true;
-      console.log('Recurring bills loaded:', data.length);
-      if (loadedAccounts && loadedTx && loadedBudgets && loadedBills) setLoading(false);
-    }, (err) => {
-      console.error('Error loading recurring bills:', err);
-      setError(err.message);
-      setLoading(false);
-    });
+    const unsubBills = onSnapshot(collection(db, 'recurringBills'), snap => {
+      setRecurringBills(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      loaded.bills = true; checkDone();
+    }, err => { setError(err.message); setLoading(false); });
 
-    return () => {
-      unsubscribeAccounts();
-      unsubscribeTx();
-      unsubscribeBudgets();
-      unsubscribeBills();
-    };
-  };
+    return () => { unsubAccounts(); unsubTx(); unsubBudgets(); unsubBills(); };
+  }
+
+  function handleRefresh() {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1200);
+  }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <div className="text-4xl mb-4">💰</div>
-          <p className="text-gray-400">Loading Finance Dashboard...</p>
+          <div className="text-4xl mb-4 animate-pulse">💰</div>
+          <p className="text-gray-400">Loading Finance Dashboard…</p>
         </div>
       </div>
     );
@@ -104,63 +90,77 @@ export default function App() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-400 mb-4">Error loading data</p>
-          <p className="text-gray-500 text-sm">{error}</p>
-          <button
-            onClick={() => location.reload()}
-            className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm"
-          >
-            Try Again
-          </button>
+          <p className="text-red-400 mb-2 font-semibold">Error loading data</p>
+          <p className="text-gray-500 text-sm mb-4">{error}</p>
+          <button onClick={() => location.reload()}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm">Try Again</button>
         </div>
       </div>
     );
   }
 
+  const rootClass = darkMode
+    ? 'min-h-screen bg-black text-gray-200'
+    : 'min-h-screen bg-gray-100 text-gray-900';
+
+  const headerClass = darkMode
+    ? 'border-b border-neutral-800 sticky top-0 z-40 bg-black/95 backdrop-blur'
+    : 'border-b border-gray-300 sticky top-0 z-40 bg-white/95 backdrop-blur';
+
   return (
-    <div className="min-h-screen bg-black text-gray-200">
-      {/* Header */}
-      <header className="border-b border-neutral-800 sticky top-0 z-50 bg-black/95">
+    <div className={rootClass}>
+      <header className={headerClass}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">💰</span>
-              <h1 className="text-xl font-bold text-white">Finance Command Center</h1>
+          {/* Top row */}
+          <div className="flex items-center justify-between h-14 gap-2">
+            {/* Date info */}
+            <span className={`text-xs font-mono hidden sm:block ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              {monthLabel} · Day {day}/{daysInMonth} · {timeLabel}
+            </span>
+
+            {/* Currency pills */}
+            <div className={`flex items-center gap-1 rounded-xl p-1 ${darkMode ? 'bg-neutral-900' : 'bg-gray-200'}`}>
+              {CURRENCIES.map(cur => (
+                <button
+                  key={cur}
+                  onClick={() => setSelectedCurrency(cur)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    selectedCurrency === cur
+                      ? 'bg-emerald-500 text-white shadow'
+                      : darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >{cur}</button>
+              ))}
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Currency Selector */}
-              <select
-                value={selectedCurrency}
-                onChange={(e) => setSelectedCurrency(e.target.value)}
-                className="px-2 py-2 bg-neutral-900 border border-neutral-700 rounded-lg text-xs font-semibold text-gray-300 cursor-pointer hover:border-emerald-600 transition"
-              >
-                {CURRENCIES.map(cur => (
-                  <option key={cur} value={cur}>{cur}</option>
-                ))}
-              </select>
+            {/* Action buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddTx(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition"
+              >➕ Add Transaction</button>
 
-              {/* Action Buttons */}
-              <button className="px-3 py-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition">
-                ➕ Add
-              </button>
+              <button
+                onClick={() => setShowReconcile(true)}
+                className={`px-3 py-2 text-xs font-semibold rounded-lg border transition ${darkMode ? 'border-neutral-700 text-gray-300 hover:text-white hover:border-neutral-500' : 'border-gray-300 text-gray-600 hover:text-gray-900'}`}
+              >⚖️ Reconcile</button>
 
-              <button className="px-3 py-2 text-xs text-gray-400 hover:text-gray-200 transition border border-neutral-700 rounded-lg">
-                ↔️ Reconcile
-              </button>
+              <button
+                onClick={() => setDarkMode(d => !d)}
+                className={`px-2.5 py-2 rounded-lg text-sm transition ${darkMode ? 'text-gray-400 hover:text-yellow-400' : 'text-gray-500 hover:text-gray-800'}`}
+                title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              >{darkMode ? '🌙' : '☀️'}</button>
 
-              <button onClick={loadData} className="px-3 py-2 text-xs text-gray-400 hover:text-gray-200 transition">
-                🔄 Refresh
-              </button>
-
-              <button className="px-3 py-2 text-xs text-gray-400 hover:text-gray-200 transition">
-                🌙
-              </button>
+              <button
+                onClick={handleRefresh}
+                className={`px-2.5 py-2 rounded-lg text-sm transition ${refreshing ? 'text-emerald-400 animate-spin' : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                title="Refresh data"
+              >🔄</button>
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex gap-1 border-t border-neutral-800 -mx-4 -mb-px px-4">
+          <div className={`flex gap-1 border-t -mx-4 -mb-px px-4 ${darkMode ? 'border-neutral-800' : 'border-gray-200'}`}>
             {TABS.map(tab => (
               <button
                 key={tab.id}
@@ -168,28 +168,51 @@ export default function App() {
                 className={`px-4 py-3 text-sm font-semibold transition border-b-2 ${
                   activeTab === tab.id
                     ? 'border-emerald-500 text-emerald-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                    : darkMode
+                      ? 'border-transparent text-gray-500 hover:text-gray-300'
+                      : 'border-transparent text-gray-400 hover:text-gray-700'
                 }`}
-              >
-                {tab.icon} {tab.label}
-              </button>
+              >{tab.icon} {tab.label}</button>
             ))}
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'dashboard' && (
           <Dashboard
             accounts={accounts}
             transactions={transactions}
             budgets={budgets}
             recurringBills={recurringBills}
+            selectedCurrency={selectedCurrency}
+            darkMode={darkMode}
           />
         )}
-        {activeTab === 'transactions' && <Transactions transactions={transactions} budgets={budgets} />}
+        {activeTab === 'transactions' && (
+          <Transactions
+            transactions={transactions}
+            budgets={budgets}
+            selectedCurrency={selectedCurrency}
+          />
+        )}
       </main>
+
+      {showAddTx && (
+        <AddTransactionModal
+          accounts={accounts}
+          transactions={transactions}
+          recurringBills={recurringBills}
+          onClose={() => setShowAddTx(false)}
+        />
+      )}
+
+      {showReconcile && (
+        <ReconcileModal
+          accounts={accounts}
+          onClose={() => setShowReconcile(false)}
+        />
+      )}
     </div>
   );
 }
