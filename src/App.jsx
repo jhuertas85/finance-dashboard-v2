@@ -22,6 +22,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddTx, setShowAddTx] = useState(false);
+  const [addTxInitialTab, setAddTxInitialTab] = useState('manual');
   const [showReconcile, setShowReconcile] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -187,6 +188,7 @@ export default function App() {
             recurringBills={recurringBills}
             selectedCurrency={selectedCurrency}
             darkMode={darkMode}
+            onReviewBills={() => { setAddTxInitialTab('recurring'); setShowAddTx(true); }}
           />
         )}
         {activeTab === 'transactions' && (
@@ -203,7 +205,8 @@ export default function App() {
           accounts={accounts}
           transactions={transactions}
           recurringBills={recurringBills}
-          onClose={() => setShowAddTx(false)}
+          initialTab={addTxInitialTab}
+          onClose={() => { setShowAddTx(false); setAddTxInitialTab('manual'); }}
         />
       )}
 

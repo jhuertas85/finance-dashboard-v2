@@ -1,18 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, ComposedChart, Bar, Line
+  XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Bar, Line
 } from 'recharts';
 import {
   calculateNetWorth,
-  formatFull,
-  formatShort,
   getCategoryColor,
   getCategoryEmoji,
   getDayProgress,
   toAED,
   formatDate,
 } from './utils.js';
+import PayCreditModal from './PayCreditModal.jsx';
 
 const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Others'];
 
@@ -39,10 +38,11 @@ function calcByCategory(transactions, month, year) {
   return out;
 }
 
-export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED' }) {
+export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED', onReviewBills }) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
+  const [payingCard, setPayingCard] = useState(null);
 
   const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1;
   const dayProgress = getDayProgress();
@@ -60,9 +60,16 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   // Currency display helpers — all internal values are in AED
   const FX_DISPLAY = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
   const displayRate = FX_DISPLAY[selectedCurrency] || 1;
+
+  // Bucket totals: no decimals
   const fmt = (aed) => {
     if (aed == null || isNaN(aed)) return '—';
     return `${selectedCurrency} ${Math.round(aed / displayRate).toLocaleString()}`;
+  };
+  // Account rows: 2 decimal places
+  const fmtFull = (aed) => {
+    if (aed == null || isNaN(aed)) return '—';
+    return `${selectedCurrency} ${(aed / displayRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
   const fmtS = (aed) => {
     if (aed == null || isNaN(aed)) return '—';
@@ -72,41 +79,48 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     if (abs >= 1e3) return (v < 0 ? '-' : '') + (abs / 1e3).toFixed(1) + 'K';
     return (v < 0 ? '-' : '') + Math.round(abs);
   };
-  const fmtAcc = (balance, currency) => fmt(toAED(balance, currency));
+  const fmtAccFull = (balance, currency) => fmtFull(toAED(balance, currency));
 
   const netWorth = calculateNetWorth(accounts);
 
-  // Capital
-  const capitalAccounts = accounts.filter(a => a.netWorthBucket === 'capital');
+  // Capital — sorted desc by AED value
+  const capitalAccounts = accounts
+    .filter(a => a.netWorthBucket === 'capital')
+    .sort((a, b) => toAED(b.currentBalance, b.currency) - toAED(a.currentBalance, a.currency));
   const capitalTotal = capitalAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
-  // Usable
-  const usableAccounts = accounts.filter(a => a.netWorthBucket === 'usable');
+  // Usable — sorted desc
+  const usableAccounts = accounts
+    .filter(a => a.netWorthBucket === 'usable')
+    .sort((a, b) => toAED(b.currentBalance, b.currency) - toAED(a.currentBalance, a.currency));
   const usableTotal = usableAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
-  // Future assets
-  const futureAssetAccounts = accounts.filter(a => a.netWorthBucket === 'future' && a.kind === 'asset');
+  // Future assets — sorted desc
+  const futureAssetAccounts = accounts
+    .filter(a => a.netWorthBucket === 'future' && a.kind === 'asset')
+    .sort((a, b) => toAED(b.currentBalance, b.currency) - toAED(a.currentBalance, a.currency));
   const futureAssetsTotal = futureAssetAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
-  // Future liabilities — name-based: anything in debt bucket WITHOUT "Credit" in name is a loan/liability
-  const futureLiabilityAccounts = accounts.filter(a =>
-    (a.netWorthBucket === 'future' && a.kind === 'liability') ||
-    (a.netWorthBucket === 'debt' && !a.name.toLowerCase().includes('credit'))
-  );
+  // Future liabilities — name-based; sorted desc by abs value
+  const futureLiabilityAccounts = accounts
+    .filter(a =>
+      (a.netWorthBucket === 'future' && a.kind === 'liability') ||
+      (a.netWorthBucket === 'debt' && !a.name.toLowerCase().includes('credit'))
+    )
+    .sort((a, b) => Math.abs(toAED(b.currentBalance, b.currency)) - Math.abs(toAED(a.currentBalance, a.currency)));
   const futureLiabilitiesTotal = futureLiabilityAccounts.reduce((sum, a) => sum + Math.abs(toAED(a.currentBalance, a.currency)), 0);
 
-  // Credit cards — only accounts with "Credit" in name
-  const creditCardAccounts = accounts.filter(a =>
-    a.netWorthBucket === 'debt' && a.name.toLowerCase().includes('credit')
-  );
+  // Credit cards — most negative (highest debt) first
+  const creditCardAccounts = accounts
+    .filter(a => a.netWorthBucket === 'debt' && a.name.toLowerCase().includes('credit'))
+    .sort((a, b) => toAED(a.currentBalance, a.currency) - toAED(b.currentBalance, b.currency));
   const creditCardTotal = creditCardAccounts.reduce((sum, a) => sum + toAED(a.currentBalance, a.currency), 0);
 
   // Spending for selected month
   const monthlySpending = calcSpending(transactions, viewMonth, viewYear);
   const spendingByCategory = calcByCategory(transactions, viewMonth, viewYear);
 
-  // Budgets: docs with no month = default (applies to all months)
-  // docs with year+month = override for that specific month
+  // Budgets: docs with no month = default; docs with year+month = override
   const budgetMap = {};
   budgets.forEach(b => {
     if (!b.month) budgetMap[b.category] = b.monthlyLimit;
@@ -119,10 +133,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const totalBudget = Object.values(budgetMap).reduce((a, b) => a + b, 0);
   const spentPct = totalBudget > 0 ? (monthlySpending / totalBudget) * 100 : 0;
 
-  // Annual savings (static for now)
   const annualSavings = 177691;
 
-  // Spending detail
   const spendingData = CATEGORIES.map(cat => ({
     category: cat,
     spent: spendingByCategory[cat] || 0,
@@ -130,7 +142,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   })).filter(d => d.spent > 0 || d.budget > 0);
   const maxSpent = Math.max(...spendingData.map(d => d.spent), 1);
 
-  // Monthly Flow - last 12 months
   const monthlyFlowData = useMemo(() => {
     const monthMap = {};
     const last12 = [];
@@ -157,7 +168,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     }));
   }, [transactions]);
 
-  // Wealth Trajectory - simulated based on current values
   const wealthData = useMemo(() => {
     const pts = [];
     for (let i = 11; i >= 0; i--) {
@@ -176,7 +186,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     return pts;
   }, [capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, netWorth.total]);
 
-  // Recurring bills
   const recurringBillsData = recurringBills.map(bill => ({
     ...bill,
     daysUntilDue: bill.dueDate
@@ -186,32 +195,48 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const overdueBills = recurringBillsData.filter(b => b.daysUntilDue != null && b.daysUntilDue < 0);
   const dueSoonBills = recurringBillsData.filter(b => b.daysUntilDue != null && b.daysUntilDue >= 0 && b.daysUntilDue <= 7);
 
-  // Recent transactions
   const recentTx = transactions
     .filter(t => t.type === 'expense')
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 15);
+
+  // Credit cards with outstanding balance
+  const cardsWithBalance = creditCardAccounts.filter(a => a.currentBalance < 0);
 
   return (
     <div className="space-y-6 pb-12">
 
       {/* Alert Banner */}
       {(overdueBills.length > 0 || dueSoonBills.length > 0) && (
-        <div className={`rounded-2xl p-4 border ${overdueBills.length > 0 ? 'bg-red-900/20 border-red-700' : 'bg-amber-900/20 border-amber-700'}`}>
-          <div className="flex items-start gap-3">
-            <span className="text-xl mt-1">{overdueBills.length > 0 ? '⚠️' : '📅'}</span>
+        <div className={`rounded-2xl px-5 py-4 border flex items-center justify-between gap-4 ${
+          overdueBills.length > 0 ? 'bg-red-950/30 border-red-800' : 'bg-amber-950/30 border-amber-800'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🔔</span>
             <div>
-              {overdueBills.length > 0 && <p className="text-red-400 font-semibold mb-1">{overdueBills.length} bill{overdueBills.length !== 1 ? 's' : ''} overdue</p>}
-              {dueSoonBills.length > 0 && <p className="text-amber-400 text-sm">{dueSoonBills.length} bill{dueSoonBills.length !== 1 ? 's' : ''} due within 7 days</p>}
+              <p className={`font-bold text-sm ${overdueBills.length > 0 ? 'text-red-400' : 'text-amber-400'}`}>
+                {overdueBills.length > 0 && `${overdueBills.length} bill${overdueBills.length !== 1 ? 's' : ''} overdue`}
+                {overdueBills.length > 0 && dueSoonBills.length > 0 && ' · '}
+                {dueSoonBills.length > 0 && `${dueSoonBills.length} due soon`}
+              </p>
+              <p className="text-gray-500 text-xs mt-0.5">Open Add Transaction → Recurring Bills to review and pay</p>
             </div>
           </div>
+          <button
+            onClick={onReviewBills}
+            className={`shrink-0 px-4 py-2 rounded-xl text-xs font-semibold border transition ${
+              overdueBills.length > 0
+                ? 'border-red-700 text-red-400 hover:bg-red-900/30'
+                : 'border-amber-700 text-amber-400 hover:bg-amber-900/30'
+            }`}
+          >
+            📋 Review Bills →
+          </button>
         </div>
       )}
 
       {/* Top KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-        {/* NET WORTH */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">NET WORTH</span>
@@ -221,7 +246,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           <div className="text-xs text-emerald-400">+7.9% ({fmtS(netWorth.total * 0.079)}) vs last month</div>
         </div>
 
-        {/* SPENT THIS MONTH */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">SPENT THIS MONTH</span>
@@ -229,36 +253,25 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           </div>
           <div className="text-3xl font-bold text-white mb-1">{fmt(monthlySpending)}</div>
           <div className="flex items-center justify-between text-xs text-gray-500 mt-3">
-            <span>
-              of {totalBudget > 0 ? fmt(totalBudget) : '—'} · {totalBudget > 0 ? `${Math.round(spentPct)}% used` : 'no budget set'}
-            </span>
+            <span>of {totalBudget > 0 ? fmt(totalBudget) : '—'} · {totalBudget > 0 ? `${Math.round(spentPct)}% used` : 'no budget set'}</span>
             <span>Day {dayProgress.day}/{dayProgress.daysInMonth}</span>
           </div>
           <div className="relative w-full bg-gray-800 rounded-full h-2 mt-2">
             {totalBudget > 0 && (
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${Math.min(spentPct, 100)}%`,
-                  backgroundColor: spentPct > 100 ? '#ef4444' : spentPct > 75 ? '#f59e0b' : '#10b981',
-                }}
-              />
+              <div className="h-full rounded-full transition-all" style={{
+                width: `${Math.min(spentPct, 100)}%`,
+                backgroundColor: spentPct > 100 ? '#ef4444' : spentPct > 75 ? '#f59e0b' : '#10b981',
+              }} />
             )}
-            {/* Pace marker — white line showing where spending should be today */}
-            <div
-              className="absolute top-0 bottom-0 w-0.5 rounded-full"
-              style={{ left: `${dayProgress.pct}%`, backgroundColor: '#ffffff', opacity: 0.8 }}
-            />
+            <div className="absolute top-0 bottom-0 w-0.5 rounded-full" style={{ left: `${dayProgress.pct}%`, backgroundColor: '#ffffff', opacity: 0.8 }} />
           </div>
           {totalBudget > 0 && (
             <div className="text-xs mt-1" style={{ color: spentPct <= dayProgress.pct ? '#10b981' : '#f59e0b' }}>
-              {spentPct <= dayProgress.pct ? '↓ Under pace' : '↑ Ahead of pace'}
-              {' '}— pace at {Math.round(dayProgress.pct)}%
+              {spentPct <= dayProgress.pct ? '↓ Under pace' : '↑ Ahead of pace'} — pace at {Math.round(dayProgress.pct)}%
             </div>
           )}
         </div>
 
-        {/* ANNUAL SAVINGS */}
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">ANNUAL SAVINGS TRACKER</span>
@@ -278,78 +291,115 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         </div>
       </div>
 
-      {/* Capital & Assets Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Asset Buckets — 4 columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
         {/* Capital */}
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Capital: {fmt(capitalTotal)}</h3>
-          <div className="space-y-2">
+        <div className="bg-purple-950/20 border border-purple-800/50 rounded-2xl p-5 flex flex-col">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base bg-purple-900/50 rounded-lg p-1.5">🏦</span>
+            <span className="text-xs font-bold uppercase text-gray-400">Capital</span>
+          </div>
+          <div className="text-2xl font-bold text-cyan-400 mb-4">{fmt(capitalTotal)}</div>
+          <div className="space-y-1.5 flex-1">
             {capitalAccounts.map(acc => (
-              <div key={acc.id} className="flex justify-between text-xs">
-                <span className="text-gray-400">{acc.name}</span>
-                <span className="text-gray-200 font-mono">{fmtAcc(acc.currentBalance, acc.currency)}</span>
+              <div key={acc.id} className="flex justify-between text-xs gap-2">
+                <span className="text-gray-400 truncate">{acc.name}</span>
+                <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
               </div>
             ))}
           </div>
-          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">Liquid • immediately available</div>
+          <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-purple-900/40">Liquid · immediately available</div>
         </div>
 
-        {/* Assets - Usable */}
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Assets — Usable: {fmt(usableTotal)}</h3>
-          <div className="space-y-2">
+        {/* Assets — Usable */}
+        <div className="bg-blue-950/20 border border-blue-800/50 rounded-2xl p-5 flex flex-col">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base bg-blue-900/50 rounded-lg p-1.5">📊</span>
+            <span className="text-xs font-bold uppercase text-gray-400">Assets — Usable</span>
+          </div>
+          <div className="text-2xl font-bold text-blue-400 mb-4">{fmt(usableTotal)}</div>
+          <div className="space-y-1.5 flex-1">
             {usableAccounts.map(acc => (
-              <div key={acc.id} className="flex justify-between text-xs">
-                <span className="text-gray-400">{acc.name}</span>
-                <span className="text-gray-200 font-mono">{fmtAcc(acc.currentBalance, acc.currency)}</span>
+              <div key={acc.id} className="flex justify-between text-xs gap-2">
+                <span className="text-gray-400 truncate">{acc.name}</span>
+                <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
               </div>
             ))}
           </div>
-          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">Sellable within days</div>
+          <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-blue-900/40">Sellable within days</div>
         </div>
 
-        {/* Assets - Future (with liabilities inline) */}
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">
-            Assets — Future: {fmt(futureAssetsTotal - futureLiabilitiesTotal)}
-          </h3>
-          <div className="space-y-2">
+        {/* Assets — Future */}
+        <div className="bg-neutral-950 border border-neutral-700 rounded-2xl p-5 flex flex-col">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base bg-neutral-800 rounded-lg p-1.5">🔒</span>
+            <span className="text-xs font-bold uppercase text-gray-400">Assets — Future</span>
+          </div>
+          <div className="text-2xl font-bold text-emerald-400 mb-1">{fmt(futureAssetsTotal - futureLiabilitiesTotal)}</div>
+          <div className="text-xs text-gray-500 mb-4">
+            gross {fmt(futureAssetsTotal)} – {fmt(futureLiabilitiesTotal)}
+          </div>
+          <div className="space-y-1.5 flex-1">
             {futureAssetAccounts.map(acc => (
-              <div key={acc.id} className="flex justify-between text-xs">
-                <span className="text-gray-400">{acc.name}</span>
-                <span className="text-gray-200 font-mono">{fmtAcc(acc.currentBalance, acc.currency)}</span>
+              <div key={acc.id} className="flex justify-between text-xs gap-2">
+                <span className="text-gray-400 truncate">{acc.name}</span>
+                <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
               </div>
             ))}
           </div>
           {futureLiabilityAccounts.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-800 space-y-2">
-              {futureLiabilityAccounts.map(acc => (
-                <div key={acc.id} className="flex justify-between text-xs">
-                  <span className="text-gray-500">{acc.name}</span>
-                  <span className="text-red-400 font-mono">{fmtAcc(acc.currentBalance, acc.currency)}</span>
-                </div>
-              ))}
+            <div className="mt-3 pt-3 border-t border-neutral-800">
+              <p className="text-xs text-gray-600 mb-1.5">Outstanding contributions:</p>
+              <div className="space-y-1">
+                {futureLiabilityAccounts.map(acc => (
+                  <div key={acc.id} className="flex justify-between text-xs gap-2">
+                    <span className="text-gray-600 truncate">{acc.name}</span>
+                    <span className="text-red-500/70 font-mono shrink-0">–{fmtFull(Math.abs(toAED(acc.currentBalance, acc.currency)))}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
-            Locked • long-term contributions reduce as you pay
-          </div>
+          <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-neutral-800">Locked · long-term · contributions reduce as you pay</div>
         </div>
 
         {/* Credit Cards */}
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Credit Cards: {fmt(creditCardTotal)}</h3>
-          <div className="space-y-2">
+        <div className="bg-red-950/10 border border-red-900/40 rounded-2xl p-5 flex flex-col">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base bg-red-900/30 rounded-lg p-1.5">💳</span>
+            <span className="text-xs font-bold uppercase text-gray-400">Credit Cards</span>
+          </div>
+          <div className="text-2xl font-bold text-red-400 mb-4">{fmt(creditCardTotal)}</div>
+          <div className="space-y-2 flex-1">
             {creditCardAccounts.map(acc => (
-              <div key={acc.id} className="flex justify-between text-xs">
-                <span className="text-gray-400">💳 {acc.name}</span>
-                <span className={acc.currentBalance < 0 ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>
-                  {fmtAcc(acc.currentBalance, acc.currency)}
-                </span>
+              <div key={acc.id} className="flex justify-between items-center text-xs gap-2">
+                <span className="text-gray-400 truncate">💳 {acc.name}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {acc.currentBalance === 0 && (
+                    <span className="px-1.5 py-0.5 bg-emerald-900/40 text-emerald-500 rounded text-xs font-semibold">Pay</span>
+                  )}
+                  <span className={acc.currentBalance < 0 ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>
+                    {fmtAccFull(acc.currentBalance, acc.currency)}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
+          {cardsWithBalance.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {cardsWithBalance.map(acc => (
+                <button
+                  key={acc.id}
+                  onClick={() => setPayingCard(acc)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition"
+                >
+                  <span>💳 Pay {acc.name}</span>
+                  <span>{fmt(Math.abs(toAED(acc.currentBalance, acc.currency)))} →</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -398,19 +448,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-sm font-bold uppercase text-gray-300">Spending Detail</h3>
-          {/* Month navigator */}
           <div className="flex items-center gap-2">
             <button onClick={prevMonth} className="px-2 py-1 text-gray-400 hover:text-white text-sm border border-neutral-700 rounded">‹</button>
             <span className="text-xs font-semibold text-gray-300 w-16 text-center">{getMonthLabel(viewYear, viewMonth)}</span>
-            <button
-              onClick={nextMonth}
-              disabled={isCurrentMonth}
-              className="px-2 py-1 text-gray-400 hover:text-white text-sm border border-neutral-700 rounded disabled:opacity-30"
-            >›</button>
+            <button onClick={nextMonth} disabled={isCurrentMonth} className="px-2 py-1 text-gray-400 hover:text-white text-sm border border-neutral-700 rounded disabled:opacity-30">›</button>
           </div>
         </div>
 
-        {/* Summary row */}
         <div className="flex gap-6 mb-6 pb-4 border-b border-gray-800">
           <div>
             <div className="text-xs text-gray-500 mb-1">INCOME</div>
@@ -444,19 +488,14 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
               return (
                 <div key={item.category}>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-gray-300">
-                      {getCategoryEmoji(item.category)} {item.category}
-                    </span>
+                    <span className="text-xs font-medium text-gray-300">{getCategoryEmoji(item.category)} {item.category}</span>
                     <span className="text-xs text-gray-400 font-mono">
                       {fmtS(item.spent)}
                       {item.budget > 0 && <span className="text-gray-600"> / {fmtS(item.budget)} · {Math.round(pct)}%</span>}
                     </span>
                   </div>
                   <div className="w-full bg-gray-800 rounded-full h-2">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${barWidth}%`, backgroundColor: barColor }}
-                    />
+                    <div className="h-full rounded-full transition-all" style={{ width: `${barWidth}%`, backgroundColor: barColor }} />
                   </div>
                 </div>
               );
@@ -522,7 +561,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                   <td className="py-2 px-2 text-gray-400 font-mono">{formatDate(tx.date)}</td>
                   <td className="py-2 px-2 text-gray-200">{tx.description}</td>
                   <td className="py-2 px-2 text-gray-400">{getCategoryEmoji(tx.category)} {tx.category}</td>
-                  <td className="py-2 px-2 text-right text-red-400 font-mono">−{fmtAcc(tx.amount, tx.currency)}</td>
+                  <td className="py-2 px-2 text-right text-red-400 font-mono">−{fmtAccFull(tx.amount, tx.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -530,6 +569,15 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         </div>
       </div>
 
+      {/* Pay Credit Card Modal */}
+      {payingCard && (
+        <PayCreditModal
+          creditCard={payingCard}
+          accounts={accounts}
+          transactions={transactions}
+          onClose={() => setPayingCard(null)}
+        />
+      )}
     </div>
   );
 }

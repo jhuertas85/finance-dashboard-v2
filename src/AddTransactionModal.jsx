@@ -28,8 +28,8 @@ function getLastTx(transactions, accountId) {
   return txs[0] || null;
 }
 
-export default function AddTransactionModal({ accounts, transactions = [], recurringBills = [], onClose }) {
-  const [tab, setTab] = useState('manual');
+export default function AddTransactionModal({ accounts, transactions = [], recurringBills = [], onClose, initialTab = 'manual' }) {
+  const [tab, setTab] = useState(initialTab);
   const [type, setType] = useState('expense');
   const [date, setDate] = useState(todayISO());
   const [description, setDescription] = useState('');
