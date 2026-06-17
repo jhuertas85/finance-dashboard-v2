@@ -717,17 +717,17 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                 label={{ value: 'now', position: 'insideTopRight', fill: '#9ca3af', fontSize: 9 }}
               />
             )}
-            <Bar dataKey="budget" name="Budget" fill="#a855f7" barSize={7} cursor="pointer">
+            <Bar dataKey="budget" name="Budget" fill="#a855f7" barSize={6} cursor="pointer">
               {monthlyFlowData.map((entry, i) => (
                 <Cell key={i} fill="#a855f7" opacity={entry.isFuture ? 0.3 : 0.7} />
               ))}
             </Bar>
-            <Bar dataKey="expenses" name="Expenses" fill="#ef4444" cursor="pointer">
+            <Bar dataKey="expenses" name="Expenses" fill="#ef4444" barSize={18} cursor="pointer">
               {monthlyFlowData.map((entry, i) => (
                 <Cell key={i} fill="#ef4444" opacity={entry.isFuture ? 0.3 : 0.85} />
               ))}
             </Bar>
-            <Bar dataKey="income" name="Income" fill="#10b981" cursor="pointer">
+            <Bar dataKey="income" name="Income" fill="#10b981" barSize={18} cursor="pointer">
               {monthlyFlowData.map((entry, i) => (
                 <Cell key={i} fill="#10b981" opacity={entry.isFuture ? 0.3 : 0.85} />
               ))}
