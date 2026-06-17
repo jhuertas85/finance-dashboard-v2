@@ -363,10 +363,10 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         UsableHist: isHist ? u : undefined,
         FutHist: isHist ? f : undefined,
         NWHist: isHist ? nw : undefined,
-        // Projected boundary lines — only for strictly future months (no duplicate at nowKey)
-        CapPB: isFuture ? c : undefined,
-        CapUsablePB: isFuture ? (c + u) : undefined,
-        NWProj: isFuture ? nw : undefined,
+        // Projected boundary lines — start at current month so they visually connect to the areas
+        CapPB: (isFuture || isCurrent) ? c : undefined,
+        CapUsablePB: (isFuture || isCurrent) ? (c + u) : undefined,
+        NWProj: (isFuture || isCurrent) ? nw : undefined,
       };
     });
   }, [transactions, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange]);
