@@ -356,15 +356,17 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       const label = new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
       return {
         key, label, isFuture, isCurrent,
+        // Raw individual values (used by custom tooltip)
+        capVal: c, usableVal: u, futVal: f, nwVal: nw,
         // Historical stacked areas (solid)
         CapHist: isHist ? c : undefined,
         UsableHist: isHist ? u : undefined,
         FutHist: isHist ? f : undefined,
         NWHist: isHist ? nw : undefined,
-        // Projected boundary lines (dashed) — top edge of each stacked band
-        CapPB: isProj ? c : undefined,
-        CapUsablePB: isProj ? (c + u) : undefined,
-        NWProj: isProj ? nw : undefined,
+        // Projected boundary lines — only for strictly future months (no duplicate at nowKey)
+        CapPB: isFuture ? c : undefined,
+        CapUsablePB: isFuture ? (c + u) : undefined,
+        NWProj: isFuture ? nw : undefined,
       };
     });
   }, [transactions, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange]);
@@ -827,8 +829,21 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
             <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
             <Tooltip
-              contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }}
-              formatter={(v, name, props) => [fmtS(v) + (props?.payload?.isFuture ? ' (est.)' : ''), name]}
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0]?.payload;
+                if (!d) return null;
+                const sfx = d.isFuture ? ' (est.)' : '';
+                return (
+                  <div style={{ background: '#111', border: '1px solid #333', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                    <p style={{ color: '#9ca3af', fontWeight: 600, marginBottom: 6 }}>{label}</p>
+                    <p style={{ color: '#06b6d4', marginBottom: 2 }}>Net Worth: {fmtS(d.nwVal)}{sfx}</p>
+                    <p style={{ color: '#f59e0b', marginBottom: 2 }}>Future: {fmtS(d.futVal)}{sfx}</p>
+                    <p style={{ color: '#10b981', marginBottom: 2 }}>Usable: {fmtS(d.usableVal)}{sfx}</p>
+                    <p style={{ color: '#8b5cf6' }}>Capital: {fmtS(d.capVal)}{sfx}</p>
+                  </div>
+                );
+              }}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {/* Historical: solid stacked areas */}
