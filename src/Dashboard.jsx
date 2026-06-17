@@ -480,41 +480,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         </div>
       </div>
 
-      {/* Monthly Flow Chart */}
-      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Monthly Flow — Last 12 Months</h3>
-        <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={monthlyFlowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
-            <Tooltip contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }} formatter={(v, name) => [fmtS(v), name]} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="expenses" fill="#ef4444" name="Expenses" opacity={0.85} />
-            <Bar dataKey="income" fill="#10b981" name="Income" opacity={0.85} />
-            <Line type="monotone" dataKey="savings" stroke="#f59e0b" strokeWidth={2} dot={false} name="Savings" />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Wealth Trajectory Chart */}
-      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Wealth Trajectory</h3>
-        <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={wealthData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
-            <Tooltip contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }} formatter={(v, name) => [fmtS(v), name]} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Area type="monotone" dataKey="Capital" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.5} />
-            <Area type="monotone" dataKey="Usable" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.5} />
-            <Area type="monotone" dataKey="Future" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.5} />
-            <Line type="monotone" dataKey="NetWorth" stroke="#06b6d4" strokeWidth={2} dot={false} name="Net Worth" />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-
       {/* ── Spending Detail ──────────────────────────────────────────────────── */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
 
@@ -630,7 +595,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                 </div>
               );
             } else {
-              // Absolute spend: bar = % of total expenses, color = budget pace color
               const pctOfTotal = periodExpenses > 0 ? (item.spent / periodExpenses) * 100 : 0;
               const barWidth = (item.spent / maxPeriodSpent) * 100;
               return (
@@ -659,6 +623,41 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span><span className="text-red-400">●</span> &gt;85% budget</span>
           </div>
         )}
+      </div>
+
+      {/* Monthly Flow Chart */}
+      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Monthly Flow — Last 12 Months</h3>
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={monthlyFlowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+            <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
+            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
+            <Tooltip contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }} formatter={(v, name) => [fmtS(v), name]} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Bar dataKey="expenses" fill="#ef4444" name="Expenses" opacity={0.85} />
+            <Bar dataKey="income" fill="#10b981" name="Income" opacity={0.85} />
+            <Line type="monotone" dataKey="savings" stroke="#f59e0b" strokeWidth={2} dot={false} name="Savings" />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Wealth Trajectory Chart */}
+      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Wealth Trajectory</h3>
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={wealthData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+            <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
+            <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
+            <Tooltip contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }} formatter={(v, name) => [fmtS(v), name]} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area type="monotone" dataKey="Capital" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.5} />
+            <Area type="monotone" dataKey="Usable" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.5} />
+            <Area type="monotone" dataKey="Future" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.5} />
+            <Line type="monotone" dataKey="NetWorth" stroke="#06b6d4" strokeWidth={2} dot={false} name="Net Worth" />
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Budget Overview Table (monthly) */}
