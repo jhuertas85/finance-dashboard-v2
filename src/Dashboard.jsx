@@ -12,6 +12,7 @@ import {
   formatDate,
 } from './utils.js';
 import PayCreditModal from './PayCreditModal.jsx';
+import BudgetGrid from './BudgetGrid.jsx';
 
 const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Others'];
 
@@ -868,43 +869,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         </ResponsiveContainer>
       </div>
 
-      {/* Budget Overview Table (monthly) */}
-      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Budget Overview — {getMonthLabel(viewYear, viewMonth)}</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left py-2 px-2 text-gray-500 font-medium">Category</th>
-                <th className="text-right py-2 px-2 text-gray-500 font-medium">Budget</th>
-                <th className="text-right py-2 px-2 text-gray-500 font-medium">Spent</th>
-                <th className="text-right py-2 px-2 text-gray-500 font-medium">Left</th>
-                <th className="text-right py-2 px-2 text-gray-500 font-medium">%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {CATEGORIES.map(cat => {
-                const budget = budgetMap[cat] || 0;
-                const spent = spendingByCategory[cat] || 0;
-                if (budget === 0 && spent === 0) return null;
-                const remaining = budget - spent;
-                const pct = budget > 0 ? (spent / budget) * 100 : null;
-                return (
-                  <tr key={cat} className="border-b border-gray-900 hover:bg-gray-900/30">
-                    <td className="py-2 px-2 text-gray-300">{getCategoryEmoji(cat)} {cat}</td>
-                    <td className="text-right py-2 px-2 font-mono text-gray-400">{budget > 0 ? fmtS(budget) : '—'}</td>
-                    <td className="text-right py-2 px-2 font-mono text-white">{fmtS(spent)}</td>
-                    <td className={`text-right py-2 px-2 font-mono ${remaining >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {budget > 0 ? (remaining >= 0 ? fmtS(remaining) : '-' + fmtS(Math.abs(remaining))) : '—'}
-                    </td>
-                    <td className="text-right py-2 px-2 text-gray-400">{pct != null ? `${Math.round(pct)}%` : '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Budget Overview Grid */}
+      <BudgetGrid budgets={budgets} transactions={transactions} selectedCurrency={selectedCurrency} />
 
       {/* Transactions */}
       <div ref={txSectionRef} className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
