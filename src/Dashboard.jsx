@@ -257,6 +257,15 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       ? incomeMonths.reduce((s, k) => s + dataMap[k].income, 0) / incomeMonths.length : 0;
     const estExpenses = expMonths.length > 0
       ? expMonths.reduce((s, k) => s + dataMap[k].expenses, 0) / expMonths.length : 0;
+    function getMonthBudget(m) {
+      const map = {};
+      budgets.forEach(b => { if (!b.month) map[b.category] = b.monthlyLimit; });
+      budgets.forEach(b => {
+        if (b.month && parseInt(b.month) === m && parseInt(b.year) === CHART_YEAR)
+          map[b.category] = b.monthlyLimit;
+      });
+      return Object.values(map).reduce((a, v) => a + v, 0);
+    }
     return Object.values(dataMap).map(({ key, month: m, income, expenses }) => {
       const isCurrent = key === currentKey;
       const isFuture = key > currentKey;
@@ -264,12 +273,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       const exp = isFuture ? estExpenses : expenses;
       return {
         key, month: m, income: inc, expenses: exp,
+        budget: getMonthBudget(m),
         savings: inc - exp,
         isFuture, isCurrent,
         label: new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
       };
     });
-  }, [transactions]);
+  }, [transactions, budgets]);
 
   const wealthData = useMemo(() => {
     const pts = [];
@@ -715,6 +725,11 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <Bar dataKey="income" name="Income" fill="#10b981" cursor="pointer">
               {monthlyFlowData.map((entry, i) => (
                 <Cell key={i} fill="#10b981" opacity={entry.isFuture ? 0.3 : 0.85} />
+              ))}
+            </Bar>
+            <Bar dataKey="budget" name="Budget" fill="#a855f7" cursor="pointer">
+              {monthlyFlowData.map((entry, i) => (
+                <Cell key={i} fill="#a855f7" opacity={entry.isFuture ? 0.3 : 0.7} />
               ))}
             </Bar>
             <Line type="monotone" dataKey="savings" stroke="#f59e0b" strokeWidth={2} dot={false} name="Savings"
