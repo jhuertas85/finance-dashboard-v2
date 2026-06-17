@@ -52,6 +52,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const [displayMode, setDisplayMode] = useState('budget'); // 'budget' | 'absolute'
   const [payingCard, setPayingCard] = useState(null);
   const [txFilter, setTxFilter] = useState(null);
+  const [wealthRange, setWealthRange] = useState('12M');
   const spendingDetailRef = useRef(null);
   const txSectionRef = useRef(null);
 
@@ -282,22 +283,91 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   }, [transactions, budgets]);
 
   const wealthData = useMemo(() => {
-    const pts = [];
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(1);
-      d.setMonth(d.getMonth() - i);
-      const f = (11 - i) / 11;
-      pts.push({
-        label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-        Capital: Math.round(capitalTotal * (0.82 + f * 0.18)),
-        Usable: Math.round(usableTotal * (0.88 + f * 0.12)),
-        Future: Math.round((futureAssetsTotal - futureLiabilitiesTotal) * (0.87 + f * 0.13)),
-        NetWorth: Math.round(netWorth.total * (0.84 + f * 0.16)),
-      });
+    const makeKey = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
+    const nowKey = makeKey(now.getFullYear(), now.getMonth() + 1);
+
+    // Monthly net cash flows (income – expenses) from real transactions
+    const monthFlows = {};
+    transactions.forEach(tx => {
+      const d = new Date(tx.date);
+      const key = makeKey(d.getFullYear(), d.getMonth() + 1);
+      if (!monthFlows[key]) monthFlows[key] = 0;
+      const amt = toAED(tx.amount, tx.currency);
+      if (tx.type === 'income') monthFlows[key] += amt;
+      else if (tx.type === 'expense') monthFlows[key] -= amt;
+    });
+
+    // Estimate monthly savings from past 2026 months with positive net flow
+    const past2026 = Object.keys(monthFlows).filter(k => k.startsWith('2026-') && k < nowKey);
+    const posFlows = past2026.filter(k => monthFlows[k] > 0);
+    const estSavings = posFlows.length > 0
+      ? posFlows.reduce((s, k) => s + monthFlows[k], 0) / posFlows.length : 0;
+
+    // Determine start key from range
+    let startKey;
+    const projEndYear = Math.max(now.getFullYear(), 2026);
+    if (wealthRange === 'YTD') {
+      startKey = makeKey(now.getFullYear(), 1);
+    } else if (wealthRange === 'ALL') {
+      const allKeys = Object.keys(monthFlows).sort();
+      startKey = allKeys[0] || makeKey(now.getFullYear() - 1, now.getMonth() + 1);
+    } else {
+      const back = wealthRange === '6M' ? 5 : wealthRange === '12M' ? 11 : 23;
+      const d = new Date(now.getFullYear(), now.getMonth() - back, 1);
+      startKey = makeKey(d.getFullYear(), d.getMonth() + 1);
     }
-    return pts;
-  }, [capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, netWorth.total]);
+    const endKey = makeKey(projEndYear, 12);
+
+    // Build month list from startKey to endKey
+    const months = [];
+    let [sy, sm] = startKey.split('-').map(Number);
+    const [ey, em] = endKey.split('-').map(Number);
+    while (sy < ey || (sy === ey && sm <= em)) {
+      months.push(makeKey(sy, sm));
+      if (++sm > 12) { sm = 1; sy++; }
+    }
+
+    // Reconstruct historical capital by walking backwards from current
+    const capByKey = {};
+    const histMonths = months.filter(k => k <= nowKey).sort();
+    let cap = capitalTotal;
+    for (let i = histMonths.length - 1; i >= 0; i--) {
+      capByKey[histMonths[i]] = Math.round(cap);
+      if (i > 0) cap -= (monthFlows[histMonths[i]] || 0);
+    }
+    // Project capital forward using estimated savings
+    cap = capitalTotal;
+    for (const key of months.filter(k => k > nowKey).sort()) {
+      cap += estSavings;
+      capByKey[key] = Math.round(cap);
+    }
+
+    const futNet = futureAssetsTotal - futureLiabilitiesTotal;
+    const u = Math.round(usableTotal);
+    const f = Math.round(futNet);
+
+    return months.map(key => {
+      const isFuture = key > nowKey;
+      const isCurrent = key === nowKey;
+      const isHist = !isFuture;
+      const isProj = isFuture || isCurrent;
+      const c = capByKey[key] ?? Math.round(capitalTotal);
+      const nw = c + u + f;
+      const label = new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      return {
+        key, label, isFuture, isCurrent,
+        // Historical stacked areas (solid)
+        CapHist: isHist ? c : undefined,
+        UsableHist: isHist ? u : undefined,
+        FutHist: isHist ? f : undefined,
+        NWHist: isHist ? nw : undefined,
+        // Projected boundary lines (dashed) — top edge of each stacked band
+        CapPB: isProj ? c : undefined,
+        CapUsablePB: isProj ? (c + u) : undefined,
+        NWProj: isProj ? nw : undefined,
+      };
+    });
+  }, [transactions, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange]);
 
   // ─── Recurring bills alerts ──────────────────────────────────────────────────
   const recurringBillsData = recurringBills.map(bill => ({
@@ -740,18 +810,45 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
       {/* Wealth Trajectory Chart */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Wealth Trajectory</h3>
-        <ResponsiveContainer width="100%" height={280}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-sm font-bold uppercase text-gray-300">Wealth Trajectory</h3>
+          <div className="flex bg-neutral-800 rounded-lg p-0.5">
+            {['6M', '12M', '24M', 'YTD', 'ALL'].map(r => (
+              <button key={r} onClick={() => setWealthRange(r)}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${wealthRange === r ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={300}>
           <ComposedChart data={wealthData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
             <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
-            <Tooltip contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }} formatter={(v, name) => [fmtS(v), name]} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }}
+              formatter={(v, name, props) => [fmtS(v) + (props?.payload?.isFuture ? ' (est.)' : ''), name]}
+            />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Area type="monotone" dataKey="Capital" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.5} />
-            <Area type="monotone" dataKey="Usable" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.5} />
-            <Area type="monotone" dataKey="Future" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.5} />
-            <Line type="monotone" dataKey="NetWorth" stroke="#06b6d4" strokeWidth={2} dot={false} name="Net Worth" />
+            {/* Historical: solid stacked areas */}
+            <Area type="monotone" dataKey="CapHist" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.55} name="Capital" />
+            <Area type="monotone" dataKey="UsableHist" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.55} name="Usable" />
+            <Area type="monotone" dataKey="FutHist" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.55} name="Future" />
+            {/* Historical NW line */}
+            <Line type="monotone" dataKey="NWHist" stroke="#06b6d4" strokeWidth={2} dot={false} name="Net Worth" />
+            {/* Projected dashed boundary lines (show where each stack band extends) */}
+            <Line type="monotone" dataKey="CapPB" stroke="#8b5cf6" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" connectNulls={false} />
+            <Line type="monotone" dataKey="CapUsablePB" stroke="#10b981" strokeWidth={1} strokeDasharray="5 5" dot={false} legendType="none" connectNulls={false} />
+            <Line type="monotone" dataKey="NWProj" stroke="#06b6d4" strokeWidth={1.5} strokeDasharray="5 5" dot={false} legendType="none" connectNulls={false} />
+            {/* Current month marker */}
+            {wealthData.find(d => d.isCurrent) && (
+              <ReferenceLine
+                x={wealthData.find(d => d.isCurrent)?.label}
+                stroke="#ffffff" strokeDasharray="4 4" strokeOpacity={0.5}
+                label={{ value: 'now', position: 'insideTopRight', fill: '#9ca3af', fontSize: 9 }}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
