@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Bar, Line
+  Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Bar, Line,
+  ReferenceLine, Cell,
 } from 'recharts';
 import {
   calculateNetWorth,
@@ -50,6 +51,9 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const [viewMode, setViewMode] = useState('month');   // 'month' | 'ytd' | 'year'
   const [displayMode, setDisplayMode] = useState('budget'); // 'budget' | 'absolute'
   const [payingCard, setPayingCard] = useState(null);
+  const [txFilter, setTxFilter] = useState(null);
+  const spendingDetailRef = useRef(null);
+  const txSectionRef = useRef(null);
 
   const dayProgress = getDayProgress();
 
@@ -228,29 +232,43 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
   // ─── Charts ──────────────────────────────────────────────────────────────────
   const monthlyFlowData = useMemo(() => {
-    const monthMap = {};
-    const last12 = [];
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(1);
-      d.setMonth(d.getMonth() - i);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      last12.push(key);
-      monthMap[key] = { key, income: 0, expenses: 0 };
+    const CHART_YEAR = 2026;
+    const dataMap = {};
+    for (let m = 1; m <= 12; m++) {
+      const key = `${CHART_YEAR}-${String(m).padStart(2, '0')}`;
+      dataMap[key] = { key, month: m, income: 0, expenses: 0 };
     }
     transactions.forEach(tx => {
       const d = new Date(tx.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (!monthMap[key]) return;
+      if (d.getFullYear() !== CHART_YEAR) return;
+      const key = `${CHART_YEAR}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!dataMap[key]) return;
       const amt = toAED(tx.amount, tx.currency);
-      if (tx.type === 'expense') monthMap[key].expenses += amt;
-      else if (tx.type === 'income') monthMap[key].income += amt;
+      if (tx.type === 'expense') dataMap[key].expenses += amt;
+      else if (tx.type === 'income') dataMap[key].income += amt;
     });
-    return last12.map(key => ({
-      ...monthMap[key],
-      savings: monthMap[key].income - monthMap[key].expenses,
-      label: new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-    }));
+    const currentKey = now.getFullYear() === CHART_YEAR
+      ? `${CHART_YEAR}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      : now.getFullYear() < CHART_YEAR ? `${CHART_YEAR}-01` : `${CHART_YEAR}-12`;
+    const pastKeys = Object.keys(dataMap).filter(k => k < currentKey);
+    const incomeMonths = pastKeys.filter(k => dataMap[k].income > 0);
+    const expMonths = pastKeys.filter(k => dataMap[k].expenses > 0);
+    const estIncome = incomeMonths.length > 0
+      ? incomeMonths.reduce((s, k) => s + dataMap[k].income, 0) / incomeMonths.length : 0;
+    const estExpenses = expMonths.length > 0
+      ? expMonths.reduce((s, k) => s + dataMap[k].expenses, 0) / expMonths.length : 0;
+    return Object.values(dataMap).map(({ key, month: m, income, expenses }) => {
+      const isCurrent = key === currentKey;
+      const isFuture = key > currentKey;
+      const inc = isFuture ? estIncome : income;
+      const exp = isFuture ? estExpenses : expenses;
+      return {
+        key, month: m, income: inc, expenses: exp,
+        savings: inc - exp,
+        isFuture, isCurrent,
+        label: new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+      };
+    });
   }, [transactions]);
 
   const wealthData = useMemo(() => {
@@ -281,10 +299,42 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const overdueBills = recurringBillsData.filter(b => b.daysUntilDue != null && b.daysUntilDue < 0);
   const dueSoonBills = recurringBillsData.filter(b => b.daysUntilDue != null && b.daysUntilDue >= 0 && b.daysUntilDue <= 7);
 
-  const recentTx = transactions
-    .filter(t => t.type === 'expense')
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 15);
+  function handleMonthClick(data) {
+    if (!data || data.isFuture) return;
+    setViewMode('month');
+    setViewMonth(data.month);
+    setViewYear(2026);
+    setTimeout(() => spendingDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+
+  function openTxFilter(filter) {
+    setTxFilter(filter);
+    setTimeout(() => txSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+
+  const displayedTxs = useMemo(() => {
+    if (!txFilter) {
+      return transactions
+        .filter(t => t.type === 'expense')
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 20);
+    }
+    const ytdMonths = txFilter.year === now.getFullYear() ? now.getMonth() + 1 : 12;
+    return transactions.filter(tx => {
+      const d = new Date(tx.date);
+      const y = d.getFullYear(), m = d.getMonth() + 1;
+      if (txFilter.mode === 'month') {
+        if (y !== txFilter.year || m !== txFilter.month) return false;
+      } else if (txFilter.mode === 'ytd') {
+        if (y !== txFilter.year || m > ytdMonths) return false;
+      } else {
+        if (y !== txFilter.year) return false;
+      }
+      if (txFilter.type && tx.type !== txFilter.type) return false;
+      if (txFilter.category && tx.category !== txFilter.category) return false;
+      return true;
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [transactions, txFilter]);
 
   const cardsWithPending = creditCardAccounts.filter(acc =>
     transactions.some(tx =>
@@ -481,7 +531,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       </div>
 
       {/* ── Spending Detail ──────────────────────────────────────────────────── */}
-      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+      <div ref={spendingDetailRef} className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
 
         {/* Header row */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -520,14 +570,16 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* 4 KPI boxes */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3">
-            <div className="text-xs text-gray-500 uppercase mb-1">Income</div>
+          <button onClick={() => openTxFilter({ type: 'income', category: null, year: viewYear, month: viewMonth, mode: viewMode })}
+            className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-left hover:border-emerald-700 transition">
+            <div className="text-xs text-gray-500 uppercase mb-1">Income ↗</div>
             <div className="text-lg font-bold text-emerald-400">{fmt(periodIncome)}</div>
-          </div>
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3">
-            <div className="text-xs text-gray-500 uppercase mb-1">Expenses</div>
+          </button>
+          <button onClick={() => openTxFilter({ type: 'expense', category: null, year: viewYear, month: viewMonth, mode: viewMode })}
+            className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-left hover:border-red-700 transition">
+            <div className="text-xs text-gray-500 uppercase mb-1">Expenses ↗</div>
             <div className="text-lg font-bold text-red-400">{fmt(periodExpenses)}</div>
-          </div>
+          </button>
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3">
             <div className="text-xs text-gray-500 uppercase mb-1">Savings</div>
             <div className={`text-lg font-bold ${periodSavings >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -569,12 +621,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             const catBudgetPct = item.budget > 0 ? item.pct : 0;
             const barColor = spendBarColor(catBudgetPct);
 
+            const catFilter = () => openTxFilter({ type: 'expense', category: item.category, year: viewYear, month: viewMonth, mode: viewMode });
             if (displayMode === 'budget') {
               const barWidth = item.budget > 0 ? Math.min(item.pct, 100) : (item.spent / maxPeriodSpent) * 100;
               return (
-                <div key={item.category}>
+                <div key={item.category} onClick={catFilter} className="cursor-pointer group">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-gray-300">{getCategoryEmoji(item.category)} {item.category}</span>
+                    <span className="text-xs font-medium text-gray-300 group-hover:text-white transition">{getCategoryEmoji(item.category)} {item.category}</span>
                     <span className="text-xs font-mono text-gray-400">
                       {fmt(item.spent)}
                       {item.budget > 0 && (
@@ -598,9 +651,9 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
               const pctOfTotal = periodExpenses > 0 ? (item.spent / periodExpenses) * 100 : 0;
               const barWidth = (item.spent / maxPeriodSpent) * 100;
               return (
-                <div key={item.category}>
+                <div key={item.category} onClick={catFilter} className="cursor-pointer group">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-gray-300">
+                    <span className="text-xs font-medium text-gray-300 group-hover:text-white transition">
                       {getCategoryEmoji(item.category)} {item.category}
                       <span className="text-gray-500 ml-2">{fmt(item.spent)}</span>
                     </span>
@@ -627,17 +680,45 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
       {/* Monthly Flow Chart */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-6">Monthly Flow — Last 12 Months</h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-sm font-bold uppercase text-gray-300">Monthly Flow — 2026</h3>
+          <span className="text-xs text-gray-600">Click a month to drill in · future months = estimated</span>
+        </div>
         <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={monthlyFlowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+          <ComposedChart data={monthlyFlowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}
+            onClick={e => e?.activePayload?.[0] && handleMonthClick(e.activePayload[0].payload)}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis dataKey="label" stroke="#555" tick={{ fontSize: 11 }} />
             <YAxis stroke="#555" tick={{ fontSize: 11 }} tickFormatter={v => fmtS(v)} />
-            <Tooltip contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }} formatter={(v, name) => [fmtS(v), name]} />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: 8 }}
+              formatter={(v, name, props) => {
+                const isFuture = props?.payload?.isFuture;
+                return [`${fmtS(v)}${isFuture ? ' (est.)' : ''}`, name];
+              }}
+            />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="expenses" fill="#ef4444" name="Expenses" opacity={0.85} />
-            <Bar dataKey="income" fill="#10b981" name="Income" opacity={0.85} />
-            <Line type="monotone" dataKey="savings" stroke="#f59e0b" strokeWidth={2} dot={false} name="Savings" />
+            {monthlyFlowData.find(d => d.isCurrent) && (
+              <ReferenceLine
+                x={monthlyFlowData.find(d => d.isCurrent)?.label}
+                stroke="#ffffff"
+                strokeDasharray="4 4"
+                strokeOpacity={0.5}
+                label={{ value: 'now', position: 'insideTopRight', fill: '#9ca3af', fontSize: 9 }}
+              />
+            )}
+            <Bar dataKey="expenses" name="Expenses" cursor="pointer">
+              {monthlyFlowData.map((entry, i) => (
+                <Cell key={i} fill="#ef4444" opacity={entry.isFuture ? 0.3 : 0.85} />
+              ))}
+            </Bar>
+            <Bar dataKey="income" name="Income" cursor="pointer">
+              {monthlyFlowData.map((entry, i) => (
+                <Cell key={i} fill="#10b981" opacity={entry.isFuture ? 0.3 : 0.85} />
+              ))}
+            </Bar>
+            <Line type="monotone" dataKey="savings" stroke="#f59e0b" strokeWidth={2} dot={false} name="Savings"
+              strokeDasharray={monthlyFlowData.map(d => d.isFuture ? '4 4' : '0').find(Boolean) ? undefined : undefined} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -698,9 +779,33 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         </div>
       </div>
 
-      {/* Recent Transactions */}
-      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase text-gray-300 mb-4">Recent Transactions</h3>
+      {/* Transactions */}
+      <div ref={txSectionRef} className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-bold uppercase text-gray-300">
+              {txFilter ? 'Transactions' : 'Recent Transactions'}
+            </h3>
+            {txFilter && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                {[
+                  txFilter.type && txFilter.type.charAt(0).toUpperCase() + txFilter.type.slice(1),
+                  txFilter.category,
+                  txFilter.mode === 'month' ? getMonthLabel(txFilter.year, txFilter.month)
+                    : txFilter.mode === 'ytd' ? `YTD ${txFilter.year}`
+                    : String(txFilter.year),
+                ].filter(Boolean).join(' · ')}
+                {' '}— {displayedTxs.length} transaction{displayedTxs.length !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+          {txFilter && (
+            <button onClick={() => setTxFilter(null)}
+              className="text-xs text-gray-500 hover:text-white border border-neutral-700 rounded-lg px-3 py-1.5 transition shrink-0">
+              ✕ Clear filter
+            </button>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -712,12 +817,16 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
               </tr>
             </thead>
             <tbody>
-              {recentTx.map(tx => (
+              {displayedTxs.length === 0 ? (
+                <tr><td colSpan={4} className="py-6 text-center text-gray-600">No transactions found</td></tr>
+              ) : displayedTxs.map(tx => (
                 <tr key={tx.id} className="border-b border-gray-900 hover:bg-gray-900/30">
                   <td className="py-2 px-2 text-gray-400 font-mono">{formatDate(tx.date)}</td>
                   <td className="py-2 px-2 text-gray-200">{tx.description}</td>
                   <td className="py-2 px-2 text-gray-400">{getCategoryEmoji(tx.category)} {tx.category}</td>
-                  <td className="py-2 px-2 text-right text-red-400 font-mono">−{fmtAccFull(tx.amount, tx.currency)}</td>
+                  <td className={`py-2 px-2 text-right font-mono ${tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-blue-400' : 'text-red-400'}`}>
+                    {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔' : '−'}{fmtAccFull(tx.amount, tx.currency)}
+                  </td>
                 </tr>
               ))}
             </tbody>
