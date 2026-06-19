@@ -25,8 +25,9 @@ export default function ReconcileModal({ accounts, onClose }) {
     : 0;
 
   function checkDiff() {
-    if (!account || realBalance === '') return;
-    setDiff(parseFloat(realBalance) - currentInCurrency);
+    if (!account) return;
+    const val = realBalance === '' ? 0 : parseFloat(realBalance);
+    setDiff(val - currentInCurrency);
   }
 
   async function applyAdjustment() {
@@ -34,8 +35,9 @@ export default function ReconcileModal({ accounts, onClose }) {
     setSaving(true);
     setError('');
     try {
-      const realNative = parseFloat(realBalance) / ((FX[currency] || 1) / (FX[account.currency] || 1));
-      const adjAmountInCurrency = Math.abs(parseFloat(realBalance) - currentInCurrency);
+      const realVal = realBalance === '' ? 0 : parseFloat(realBalance);
+      const realNative = realVal / ((FX[currency] || 1) / (FX[account.currency] || 1));
+      const adjAmountInCurrency = Math.abs(realVal - currentInCurrency);
 
       if (!silent) {
         await addDoc(collection(db, 'transactions'), {
@@ -160,7 +162,7 @@ export default function ReconcileModal({ accounts, onClose }) {
 
               {error && <p className="text-red-400 text-xs">{error}</p>}
 
-              <button onClick={checkDiff} disabled={!selectedId || realBalance === ''}
+              <button onClick={checkDiff} disabled={!selectedId}
                 className="w-full py-3 bg-neutral-700 hover:bg-neutral-600 text-white rounded-xl text-sm font-bold disabled:opacity-40 transition">
                 ⚖️ Check Difference
               </button>

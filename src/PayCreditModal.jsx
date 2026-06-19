@@ -89,7 +89,9 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
       batch.update(doc(db, 'accounts', payFromId), { currentBalance: payFromNewBal });
 
       // Update credit card balance toward 0
-      const cardNewBal = creditCard.currentBalance + (payAmountAED / (FX[creditCard.currency] || 1));
+      // When paying all pending charges, zero out exactly to absorb any reconciliation drift
+      const allSelected = hasLinkedTxs && selected.size === pendingTxs.length;
+      const cardNewBal = allSelected ? 0 : creditCard.currentBalance + (payAmountAED / (FX[creditCard.currency] || 1));
       batch.update(doc(db, 'accounts', creditCard.id), { currentBalance: cardNewBal });
 
       await batch.commit();
