@@ -68,7 +68,12 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
       const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (selectedMonth && monthKey !== selectedMonth) return false;
       if (selectedType && tx.type !== selectedType) return false;
-      if (selectedAccount && tx.fromAccount !== selectedAccount && tx.toAccount !== selectedAccount) return false;
+      if (selectedAccount) {
+        const acctName = accountMap[selectedAccount]?.name;
+        const matchFrom = tx.fromAccount === selectedAccount || (acctName && tx.fromAccount === acctName);
+        const matchTo = tx.toAccount === selectedAccount || (acctName && tx.toAccount === acctName);
+        if (!matchFrom && !matchTo) return false;
+      }
       if (selectedCategory && tx.category !== selectedCategory) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -85,9 +90,10 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
   const totalIncome = filtered.filter(t => t.type === 'income').reduce((s, t) => s + toAED(t.amount, t.currency), 0);
   const totalExpense = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + toAED(t.amount, t.currency), 0);
 
-  function getAccountName(id) {
-    if (!id) return null;
-    return accountMap[id]?.name || null;
+  function getAccountName(idOrName) {
+    if (!idOrName) return null;
+    // Try lookup by ID first; fall back to treating the value as already a name
+    return accountMap[idOrName]?.name || idOrName;
   }
 
   function startEdit(tx) {
