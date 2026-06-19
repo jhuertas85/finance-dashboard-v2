@@ -296,7 +296,7 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
                     <td className={`py-2.5 px-3 text-right font-mono font-semibold whitespace-nowrap ${
                       tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-blue-400' : 'text-red-400'
                     }`}>
-                      {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔' : '−'}{tx.currency} {Number(tx.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔' : '−'}{tx.currency} {Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-2.5 px-3 text-gray-600 max-w-[140px]">
                       <span className="block truncate">{tx.notes || ''}</span>
