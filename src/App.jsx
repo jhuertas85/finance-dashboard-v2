@@ -26,6 +26,12 @@ export default function App() {
   const [showReconcile, setShowReconcile] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [txFilter, setTxFilter] = useState(null);
+
+  function navigateToTx(filter) {
+    setTxFilter(filter);
+    setActiveTab('transactions');
+  }
 
   // Date/time info for header
   const now = new Date();
@@ -189,13 +195,17 @@ export default function App() {
             selectedCurrency={selectedCurrency}
             darkMode={darkMode}
             onReviewBills={() => { setAddTxInitialTab('recurring'); setShowAddTx(true); }}
+            onNavigateToTx={navigateToTx}
           />
         )}
         {activeTab === 'transactions' && (
           <Transactions
             transactions={transactions}
+            accounts={accounts}
             budgets={budgets}
             selectedCurrency={selectedCurrency}
+            externalFilter={txFilter}
+            onClearExternalFilter={() => setTxFilter(null)}
           />
         )}
       </main>

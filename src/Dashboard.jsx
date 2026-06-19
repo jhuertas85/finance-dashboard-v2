@@ -45,17 +45,15 @@ function spendBarColor(pct) {
   return '#10b981';
 }
 
-export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED', onReviewBills }) {
+export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED', onReviewBills, onNavigateToTx }) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
   const [viewMode, setViewMode] = useState('month');   // 'month' | 'ytd' | 'year'
   const [displayMode, setDisplayMode] = useState('budget'); // 'budget' | 'absolute'
   const [payingCard, setPayingCard] = useState(null);
-  const [txFilter, setTxFilter] = useState(null);
   const [wealthRange, setWealthRange] = useState('12M');
   const spendingDetailRef = useRef(null);
-  const txSectionRef = useRef(null);
 
   const dayProgress = getDayProgress();
 
@@ -377,7 +375,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     ...bill,
     daysUntilDue: bill.dueDate
       ? Math.ceil((new Date(bill.dueDate) - now) / 86400000)
-      : (bill.dueDay ? bill.dueDay - now.getDate() : null),
+      : (bill.dueDay != null ? parseInt(bill.dueDay) - now.getDate() : null),
   }));
   const overdueBills = recurringBillsData.filter(b => b.daysUntilDue != null && b.daysUntilDue < 0);
   const dueSoonBills = recurringBillsData.filter(b => b.daysUntilDue != null && b.daysUntilDue >= 0 && b.daysUntilDue <= 7);
@@ -390,34 +388,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     setTimeout(() => spendingDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
-  function openTxFilter(filter) {
-    setTxFilter(filter);
-    setTimeout(() => txSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  }
-
-  const displayedTxs = useMemo(() => {
-    if (!txFilter) {
-      return transactions
-        .filter(t => t.type === 'expense')
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .slice(0, 20);
-    }
-    const ytdMonths = txFilter.year === now.getFullYear() ? now.getMonth() + 1 : 12;
-    return transactions.filter(tx => {
-      const d = new Date(tx.date);
-      const y = d.getFullYear(), m = d.getMonth() + 1;
-      if (txFilter.mode === 'month') {
-        if (y !== txFilter.year || m !== txFilter.month) return false;
-      } else if (txFilter.mode === 'ytd') {
-        if (y !== txFilter.year || m > ytdMonths) return false;
-      } else {
-        if (y !== txFilter.year) return false;
-      }
-      if (txFilter.type && tx.type !== txFilter.type) return false;
-      if (txFilter.category && tx.category !== txFilter.category) return false;
-      return true;
-    }).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [transactions, txFilter]);
 
   const cardsWithPending = creditCardAccounts.filter(acc =>
     transactions.some(tx =>
@@ -653,12 +623,12 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* 4 KPI boxes */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <button onClick={() => openTxFilter({ type: 'income', category: null, year: viewYear, month: viewMonth, mode: viewMode })}
+          <button onClick={() => onNavigateToTx({ type: 'income', category: null, year: viewYear, month: viewMonth, mode: viewMode })}
             className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-left hover:border-emerald-700 transition">
             <div className="text-xs text-gray-500 uppercase mb-1">Income ↗</div>
             <div className="text-lg font-bold text-emerald-400">{fmt(periodIncome)}</div>
           </button>
-          <button onClick={() => openTxFilter({ type: 'expense', category: null, year: viewYear, month: viewMonth, mode: viewMode })}
+          <button onClick={() => onNavigateToTx({ type: 'expense', category: null, year: viewYear, month: viewMonth, mode: viewMode })}
             className="bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-left hover:border-red-700 transition">
             <div className="text-xs text-gray-500 uppercase mb-1">Expenses ↗</div>
             <div className="text-lg font-bold text-red-400">{fmt(periodExpenses)}</div>
@@ -704,7 +674,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             const catBudgetPct = item.budget > 0 ? item.pct : 0;
             const barColor = spendBarColor(catBudgetPct);
 
-            const catFilter = () => openTxFilter({ type: 'expense', category: item.category, year: viewYear, month: viewMonth, mode: viewMode });
+            const catFilter = () => onNavigateToTx({ type: 'expense', category: item.category, year: viewYear, month: viewMonth, mode: viewMode });
             if (displayMode === 'budget') {
               const barWidth = item.budget > 0 ? Math.min(item.pct, 100) : (item.spent / maxPeriodSpent) * 100;
               return (
@@ -871,61 +841,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
       {/* Budget Overview Grid */}
       <BudgetGrid budgets={budgets} transactions={transactions} selectedCurrency={selectedCurrency} />
-
-      {/* Transactions */}
-      <div ref={txSectionRef} className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-          <div>
-            <h3 className="text-sm font-bold uppercase text-gray-300">
-              {txFilter ? 'Transactions' : 'Recent Transactions'}
-            </h3>
-            {txFilter && (
-              <p className="text-xs text-gray-500 mt-0.5">
-                {[
-                  txFilter.type && txFilter.type.charAt(0).toUpperCase() + txFilter.type.slice(1),
-                  txFilter.category,
-                  txFilter.mode === 'month' ? getMonthLabel(txFilter.year, txFilter.month)
-                    : txFilter.mode === 'ytd' ? `YTD ${txFilter.year}`
-                    : String(txFilter.year),
-                ].filter(Boolean).join(' · ')}
-                {' '}— {displayedTxs.length} transaction{displayedTxs.length !== 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
-          {txFilter && (
-            <button onClick={() => setTxFilter(null)}
-              className="text-xs text-gray-500 hover:text-white border border-neutral-700 rounded-lg px-3 py-1.5 transition shrink-0">
-              ✕ Clear filter
-            </button>
-          )}
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left py-2 px-2 text-gray-500 font-medium">Date</th>
-                <th className="text-left py-2 px-2 text-gray-500 font-medium">Description</th>
-                <th className="text-left py-2 px-2 text-gray-500 font-medium">Category</th>
-                <th className="text-right py-2 px-2 text-gray-500 font-medium">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedTxs.length === 0 ? (
-                <tr><td colSpan={4} className="py-6 text-center text-gray-600">No transactions found</td></tr>
-              ) : displayedTxs.map(tx => (
-                <tr key={tx.id} className="border-b border-gray-900 hover:bg-gray-900/30">
-                  <td className="py-2 px-2 text-gray-400 font-mono">{formatDate(tx.date)}</td>
-                  <td className="py-2 px-2 text-gray-200">{tx.description}</td>
-                  <td className="py-2 px-2 text-gray-400">{getCategoryEmoji(tx.category)} {tx.category}</td>
-                  <td className={`py-2 px-2 text-right font-mono ${tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-blue-400' : 'text-red-400'}`}>
-                    {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔' : '−'}{fmtAccFull(tx.amount, tx.currency)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* Pay Credit Card Modal */}
       {payingCard && (

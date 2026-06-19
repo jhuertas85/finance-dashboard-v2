@@ -29,6 +29,13 @@ function getLastTx(transactions, accountId) {
 }
 
 export default function AddTransactionModal({ accounts, transactions = [], recurringBills = [], onClose, initialTab = 'manual' }) {
+  const now = new Date();
+  const todayDay = now.getDate();
+
+  // Find NBD Credit account for recurring bill payments
+  const nbdCreditAccount = accounts.find(a => a.name?.toLowerCase().includes('nbd') && a.name?.toLowerCase().includes('credit'))
+    || accounts.find(a => a.name?.toLowerCase().includes('credit'));
+
   const [tab, setTab] = useState(initialTab);
   const [type, setType] = useState('expense');
   const [date, setDate] = useState(todayISO());
@@ -42,6 +49,13 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
+
+  // Per-bill editable amounts for recurring bills tab
+  const [billAmounts, setBillAmounts] = useState(() => {
+    const m = {};
+    recurringBills.forEach(b => { m[b.id] = String(b.amount || ''); });
+    return m;
+  });
 
   const activeAccount = accounts.find(a => a.id === fromAccount);
   const lastTx = activeAccount ? getLastTx(transactions, activeAccount.id) : null;
@@ -109,22 +123,36 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
     setSaving(false);
   }
 
-  async function postRecurringBill(bill) {
+  async function payRecurringBill(bill, keepOpen = false) {
+    const amount = parseFloat(billAmounts[bill.id]);
+    if (!amount || amount <= 0) { setError(`Enter a valid amount for ${bill.name}`); return; }
+    const acct = nbdCreditAccount;
+    const isCreditCard = acct && acct.netWorthBucket === 'debt';
     setSaving(true);
     setError('');
     try {
       await addDoc(collection(db, 'transactions'), {
         date: new Date().toISOString(),
         description: bill.name,
-        amount: bill.amount,
+        amount,
         type: 'expense',
         category: bill.category || 'Others',
         currency: bill.currency || 'AED',
-        fromAccount: null,
+        fromAccount: acct?.id || null,
         toAccount: null,
         notes: 'Recurring bill',
+        reconciled: !isCreditCard,
       });
+
+      // Update account balance
+      if (acct) {
+        const aedAmt = toAED(amount, bill.currency || 'AED');
+        const newBal = acct.currentBalance - (aedAmt / (FX[acct.currency] || 1));
+        await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: newBal });
+      }
+
       setSavedCount(n => n + 1);
+      if (!keepOpen) onClose();
     } catch (e) {
       setError(e.message);
     }
@@ -264,24 +292,73 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
             </button>
           </div>
         ) : (
-          <div className="p-4 space-y-3">
+          <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
             {recurringBills.length === 0 ? (
               <p className="text-gray-500 text-sm text-center py-6">No recurring bills configured</p>
-            ) : (
-              recurringBills.map(bill => (
-                <div key={bill.id} className="flex items-center justify-between bg-neutral-800 rounded-xl px-4 py-3">
-                  <div>
-                    <p className="text-sm text-white font-medium">{bill.name}</p>
-                    <p className="text-xs text-gray-500">{bill.currency} {bill.amount} · {bill.category}</p>
+            ) : (() => {
+              const overdue = recurringBills.filter(b => b.dueDay != null && parseInt(b.dueDay) <= todayDay);
+              const upcoming = recurringBills.filter(b => b.dueDay == null || parseInt(b.dueDay) > todayDay);
+              const paidThisMonth = transactions.filter(tx => {
+                const d = new Date(tx.date);
+                return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && tx.notes === 'Recurring bill';
+              }).map(tx => tx.description);
+
+              function BillRow({ bill }) {
+                const isPaid = paidThisMonth.includes(bill.name);
+                return (
+                  <div className={`rounded-xl border px-4 py-3 ${isPaid ? 'border-neutral-700 opacity-50' : 'border-neutral-700 bg-neutral-800'}`}>
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <p className="text-sm text-white font-medium">{bill.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {bill.category}
+                          {nbdCreditAccount ? ` · ${nbdCreditAccount.name}` : ''}
+                          {bill.dueDay ? ` · Due: ${bill.dueDay}${['st','nd','rd'][((parseInt(bill.dueDay)+90)%100-10)%10-1]||'th'}` : ''}
+                        </p>
+                      </div>
+                      {isPaid && <span className="text-xs text-emerald-500 font-semibold shrink-0">✓ Paid</span>}
+                    </div>
+                    {!isPaid && (
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="number"
+                          value={billAmounts[bill.id] ?? ''}
+                          onChange={e => setBillAmounts(prev => ({ ...prev, [bill.id]: e.target.value }))}
+                          className="w-28 bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white text-sm font-mono"
+                        />
+                        <span className="text-xs text-gray-500">{bill.currency || 'AED'}</span>
+                        <button onClick={() => payRecurringBill(bill, true)} disabled={saving}
+                          className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold disabled:opacity-40 transition">
+                          + Add Another
+                        </button>
+                        <button onClick={() => payRecurringBill(bill, false)} disabled={saving}
+                          className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold disabled:opacity-40 transition">
+                          ✓ Pay Now
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <button onClick={() => postRecurringBill(bill)} disabled={saving}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold disabled:opacity-40">
-                    Post
-                  </button>
-                </div>
-              ))
-            )}
-            {error && <p className="text-red-400 text-xs">{error}</p>}
+                );
+              }
+
+              return (
+                <>
+                  {overdue.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-red-400 uppercase tracking-wide">⚠ Overdue</p>
+                      {overdue.map(bill => <BillRow key={bill.id} bill={bill} />)}
+                    </div>
+                  )}
+                  {upcoming.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mt-2">Upcoming</p>
+                      {upcoming.map(bill => <BillRow key={bill.id} bill={bill} />)}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+            {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
           </div>
         )}
       </div>
