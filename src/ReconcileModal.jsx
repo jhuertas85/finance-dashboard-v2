@@ -16,10 +16,10 @@ export default function ReconcileModal({ accounts, onClose }) {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
+  const [silent, setSilent] = useState(false);
 
   const account = accounts.find(a => a.id === selectedId);
 
-  // Current balance converted to chosen display currency
   const currentInCurrency = account
     ? (account.currentBalance * (FX[currency] || 1)) / (FX[account.currency] || 1)
     : 0;
@@ -37,17 +37,19 @@ export default function ReconcileModal({ accounts, onClose }) {
       const realNative = parseFloat(realBalance) / ((FX[currency] || 1) / (FX[account.currency] || 1));
       const adjAmountInCurrency = Math.abs(parseFloat(realBalance) - currentInCurrency);
 
-      await addDoc(collection(db, 'transactions'), {
-        date: new Date().toISOString(),
-        description: `Reconciliation — ${account.name}`,
-        amount: adjAmountInCurrency,
-        type: diff >= 0 ? 'income' : 'expense',
-        category: 'Others',
-        currency,
-        fromAccount: diff < 0 ? account.id : null,
-        toAccount: diff >= 0 ? account.id : null,
-        notes: 'Reconciliation adjustment',
-      });
+      if (!silent) {
+        await addDoc(collection(db, 'transactions'), {
+          date: new Date().toISOString(),
+          description: `Reconciliation — ${account.name}`,
+          amount: adjAmountInCurrency,
+          type: diff >= 0 ? 'income' : 'expense',
+          category: 'Others',
+          currency,
+          fromAccount: diff < 0 ? account.id : null,
+          toAccount: diff >= 0 ? account.id : null,
+          notes: 'Reconciliation adjustment',
+        });
+      }
 
       await updateDoc(doc(db, 'accounts', account.id), { currentBalance: realNative });
       setDone(true);
@@ -140,9 +142,16 @@ export default function ReconcileModal({ accounts, onClose }) {
                       <p className="text-gray-500 text-xs mt-0.5">
                         {diff > 0 ? 'Account is under-recorded — will add income adjustment' : 'Account is over-recorded — will add expense adjustment'}
                       </p>
+                      <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+                        <input type="checkbox" checked={silent} onChange={e => setSilent(e.target.checked)}
+                          className="accent-amber-500 w-3.5 h-3.5" />
+                        <span className="text-xs text-gray-400">
+                          Silent correction — update balance only, <span className="text-gray-500">no adjustment transaction</span>
+                        </span>
+                      </label>
                       <button onClick={applyAdjustment} disabled={saving}
-                        className="mt-3 w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40">
-                        {saving ? 'Saving…' : 'Apply Adjustment & Update Balance'}
+                        className="mt-2 w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold disabled:opacity-40">
+                        {saving ? 'Saving…' : silent ? 'Set Balance Directly' : 'Apply Adjustment & Update Balance'}
                       </button>
                     </>
                   )}
