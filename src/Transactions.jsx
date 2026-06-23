@@ -337,7 +337,12 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
                     <td className={`py-2.5 px-3 text-right font-mono font-semibold whitespace-nowrap ${
                       tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-blue-400' : 'text-red-400'
                     }`}>
-                      {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '↔' : '−'}{tx.currency} {Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '' : '−'}{tx.currency} {Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {tx.type === 'transfer' && tx.amountTo && tx.currencyTo && tx.currencyTo !== tx.currency && (
+                        <span className="block text-[10px] text-blue-300 font-normal">
+                          → {tx.currencyTo} {Number(tx.amountTo).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-gray-600 max-w-[140px]">
                       <span className="block truncate">{tx.notes || ''}</span>

@@ -171,7 +171,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const [date, setDate] = useState(todayISO());
   const [description, setDescription] = useState('');
   const [amountExpr, setAmountExpr] = useState('');
-  const [currency, setCurrency] = useState('AED');
+  const [amountToExpr, setAmountToExpr] = useState('');
   const [category, setCategory] = useState('Going Out');
   const [fromAccount, setFromAccount] = useState(nbdCreditAccount?.id || txAccounts[0]?.id || '');
   const [toAccount, setToAccount] = useState('');
@@ -200,6 +200,13 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const activeAccount = accounts.find(a => a.id === fromAccount);
   const lastTx = activeAccount ? getLastTx(transactions, activeAccount.id) : null;
 
+  // Derive currencies from selected accounts — user never needs to pick manually
+  const fromAcct = accounts.find(a => a.id === fromAccount);
+  const toAcct   = accounts.find(a => a.id === toAccount);
+  const fromCurrency = fromAcct?.currency || 'AED';
+  const toCurrency   = toAcct?.currency   || fromCurrency;
+  const isCrossCurrency = type === 'transfer' && !!toAcct && fromCurrency !== toCurrency;
+
   // Paid-this-month detection: match by description OR by 'Recurring bill' note
   const thisMonthDescs = transactions
     .filter(tx => { const d = new Date(tx.date); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); })
@@ -210,7 +217,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
     return thisMonthDescs.some(desc => desc === name || desc.includes(name) || name.includes(desc));
   }
 
-  function reset() { setDescription(''); setAmountExpr(''); setNotes(''); setBorrower(''); setError(''); }
+  function reset() { setDescription(''); setAmountExpr(''); setAmountToExpr(''); setNotes(''); setBorrower(''); setError(''); }
 
   // ── Manual save
   async function save(keepOpen = false) {
@@ -218,6 +225,15 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
     if (!amount || amount <= 0) { setError('Enter a valid amount'); return; }
     const acct = accounts.find(a => a.id === fromAccount);
     if (type !== 'income' && !acct) { setError('Select an account'); return; }
+    if (type === 'transfer' && !toAccount) { setError('Select a To account'); return; }
+
+    // For cross-currency transfers the user enters both sides independently
+    let amountTo = amount;
+    if (isCrossCurrency) {
+      amountTo = evalExpr(amountToExpr);
+      if (!amountTo || amountTo <= 0) { setError('Enter the amount received'); return; }
+    }
+
     const isCreditCard = acct && acct.netWorthBucket === 'debt' && acct.name.toLowerCase().includes('credit');
     const reconciled = !(type === 'expense' && isCreditCard);
     setSaving(true); setError('');
@@ -227,21 +243,25 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
         description: description.trim() || category,
         amount, type,
         category: type === 'transfer' ? 'Transfer' : category,
-        currency,
+        currency: fromCurrency,
         fromAccount: type === 'income' ? null : fromAccount,
         toAccount: type === 'income' ? fromAccount : (type === 'transfer' ? toAccount : null),
         notes: notes.trim(),
         reconciled,
         ...(category === 'Loan' && { borrower: borrower.trim() }),
+        ...(isCrossCurrency && { amountTo, currencyTo: toCurrency }),
       });
-      const aedAmt = toAED(amount, currency);
-      if (type === 'expense' && acct) await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - aedAmt / (FX[acct.currency] || 1) });
-      else if (type === 'income' && acct) await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance + aedAmt / (FX[acct.currency] || 1) });
-      else if (type === 'transfer') {
-        if (acct) await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - aedAmt / (FX[acct.currency] || 1) });
-        const toAcct = accounts.find(a => a.id === toAccount);
-        if (toAcct) await updateDoc(doc(db, 'accounts', toAcct.id), { currentBalance: toAcct.currentBalance + aedAmt / (FX[toAcct.currency] || 1) });
+
+      // Currency is now always the account's native currency so amounts deduct/add directly
+      if (type === 'expense' && acct) {
+        await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - amount });
+      } else if (type === 'income' && acct) {
+        await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance + amount });
+      } else if (type === 'transfer') {
+        if (acct) await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - amount });
+        if (toAcct) await updateDoc(doc(db, 'accounts', toAcct.id), { currentBalance: toAcct.currentBalance + amountTo });
       }
+
       setSavedCount(n => n + 1);
       if (keepOpen) reset(); else onClose();
     } catch (e) { setError(e.message); }
@@ -421,20 +441,40 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                 className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600" />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Amount (supports expressions: 45+30)</label>
+              <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">
+                {type === 'transfer' && isCrossCurrency ? `Amount Sent` : 'Amount'} (supports expressions: 45+30)
+              </label>
               <div className="flex gap-2">
                 <input type="text" value={amountExpr} onChange={e => setAmountExpr(e.target.value)}
                   placeholder="0 or 45+30"
                   className="flex-1 bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600" />
-                <select value={currency} onChange={e => setCurrency(e.target.value)}
-                  className="bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
-                  {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-                </select>
+                <span className="bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-gray-400 text-sm font-mono min-w-[64px] text-center">
+                  {fromCurrency}
+                </span>
               </div>
               {amountExpr && /[+\-*/]/.test(amountExpr) && (
                 <p className="text-xs text-gray-500 mt-1">= {evalExpr(amountExpr).toFixed(2)}</p>
               )}
             </div>
+
+            {isCrossCurrency && (
+              <div>
+                <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Amount Received</label>
+                <div className="flex gap-2">
+                  <input type="text" value={amountToExpr} onChange={e => setAmountToExpr(e.target.value)}
+                    placeholder="0 or 45+30"
+                    className="flex-1 bg-neutral-800 border border-emerald-700 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600" />
+                  <span className="bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-gray-400 text-sm font-mono min-w-[64px] text-center">
+                    {toCurrency}
+                  </span>
+                </div>
+                {amountExpr && amountToExpr && evalExpr(amountExpr) > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Implied rate: 1 {fromCurrency} = {(evalExpr(amountToExpr) / evalExpr(amountExpr)).toFixed(4)} {toCurrency}
+                  </p>
+                )}
+              </div>
+            )}
             {type !== 'transfer' && (
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Category</label>
