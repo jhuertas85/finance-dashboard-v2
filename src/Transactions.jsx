@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import { formatDate, toAED, getCategoryEmoji } from './utils.js';
+import AccountSelect, { AccountBadge } from './AccountSelect.jsx';
+import { sortAndFilterAccounts, getAccountBrand } from './accountConfig.js';
 
 const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Loan', 'Others'];
 const FX = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
@@ -61,6 +63,8 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
     accounts.forEach(a => { m[a.id] = a; });
     return m;
   }, [accounts]);
+
+  const txAccounts = useMemo(() => sortAndFilterAccounts(accounts), [accounts]);
 
   const filtered = useMemo(() => {
     return transactions.filter(tx => {
@@ -240,11 +244,13 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
             <option value="transfer">🔄 Transfer</option>
           </select>
 
-          <select value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}
-            className="px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-lg text-xs text-gray-300 cursor-pointer">
-            <option value="">All accounts</option>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
+          <AccountSelect
+            value={selectedAccount}
+            onChange={setSelectedAccount}
+            accounts={txAccounts}
+            placeholder="All accounts"
+            compact
+          />
 
           <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}
             className="px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-lg text-xs text-gray-300 cursor-pointer">
@@ -320,8 +326,13 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
                     <td className="py-2.5 px-3 text-gray-400 whitespace-nowrap">
                       {tx.category ? `${getCategoryEmoji(tx.category)} ${tx.category}` : '—'}
                     </td>
-                    <td className="py-2.5 px-3 text-gray-500 whitespace-nowrap text-[11px]">
-                      {accountDisplay || '—'}
+                    <td className="py-2.5 px-3 whitespace-nowrap text-[11px]">
+                      {accountDisplay ? (
+                        <span className="flex items-center gap-1.5 text-gray-500">
+                          <AccountBadge name={tx.type === 'transfer' ? (getAccountName(tx.fromAccount) || '') : accountDisplay} size="sm" />
+                          {accountDisplay}
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className={`py-2.5 px-3 text-right font-mono font-semibold whitespace-nowrap ${
                       tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-blue-400' : 'text-red-400'
@@ -428,24 +439,24 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
             {editingTx.type === 'expense' && (
               <div>
                 <label className="text-xs text-gray-500 uppercase font-bold block mb-1">Paid From</label>
-                <select value={editForm.fromAccount}
-                  onChange={e => setEditForm(f => ({ ...f, fromAccount: e.target.value }))}
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
-                  <option value="">— None —</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                <AccountSelect
+                  value={editForm.fromAccount}
+                  onChange={v => setEditForm(f => ({ ...f, fromAccount: v }))}
+                  accounts={txAccounts}
+                  placeholder="— None —"
+                />
               </div>
             )}
 
             {editingTx.type === 'income' && (
               <div>
                 <label className="text-xs text-gray-500 uppercase font-bold block mb-1">To Account</label>
-                <select value={editForm.toAccount}
-                  onChange={e => setEditForm(f => ({ ...f, toAccount: e.target.value }))}
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
-                  <option value="">— None —</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                <AccountSelect
+                  value={editForm.toAccount}
+                  onChange={v => setEditForm(f => ({ ...f, toAccount: v }))}
+                  accounts={txAccounts}
+                  placeholder="— None —"
+                />
               </div>
             )}
 

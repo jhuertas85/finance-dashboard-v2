@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import { toAED, getCategoryEmoji } from './utils.js';
+import AccountSelect from './AccountSelect.jsx';
+import { sortAndFilterAccounts } from './accountConfig.js';
 
 const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Loan', 'Others'];
 const CURRENCIES = ['AED', 'USD', 'EUR', 'PEN'];
@@ -159,7 +161,8 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const now = new Date();
   const todayDay = now.getDate();
 
-  const nbdCreditAccount = accounts.find(a => a.name?.toLowerCase().includes('nbd') && a.name?.toLowerCase().includes('credit'))
+  const txAccounts = sortAndFilterAccounts(accounts);
+  const nbdCreditAccount = txAccounts.find(a => a.name?.toLowerCase().includes('nbd') && a.name?.toLowerCase().includes('credit'))
     || accounts.find(a => a.name?.toLowerCase().includes('credit'));
 
   // ── Manual tab state
@@ -169,8 +172,8 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const [description, setDescription] = useState('');
   const [amountExpr, setAmountExpr] = useState('');
   const [currency, setCurrency] = useState('AED');
-  const [category, setCategory] = useState('Others');
-  const [fromAccount, setFromAccount] = useState(accounts[0]?.id || '');
+  const [category, setCategory] = useState('Going Out');
+  const [fromAccount, setFromAccount] = useState(nbdCreditAccount?.id || txAccounts[0]?.id || '');
   const [toAccount, setToAccount] = useState('');
   const [notes, setNotes] = useState('');
   const [borrower, setBorrower] = useState('');
@@ -453,20 +456,22 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
               <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">
                 {type === 'income' ? 'To Account' : type === 'transfer' ? 'From Account' : 'Paid From'}
               </label>
-              <select value={fromAccount} onChange={e => setFromAccount(e.target.value)}
-                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
-                <option value="">— Select —</option>
-                {accounts.map(a => <option key={a.id} value={a.id}>🔵 {a.name}</option>)}
-              </select>
+              <AccountSelect
+                value={fromAccount}
+                onChange={setFromAccount}
+                accounts={txAccounts}
+                placeholder="— Select —"
+              />
             </div>
             {type === 'transfer' && (
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">To Account</label>
-                <select value={toAccount} onChange={e => setToAccount(e.target.value)}
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
-                  <option value="">— Select —</option>
-                  {accounts.filter(a => a.id !== fromAccount).map(a => <option key={a.id} value={a.id}>🔵 {a.name}</option>)}
-                </select>
+                <AccountSelect
+                  value={toAccount}
+                  onChange={setToAccount}
+                  accounts={txAccounts.filter(a => a.id !== fromAccount)}
+                  placeholder="— Select —"
+                />
               </div>
             )}
             <div>
@@ -560,10 +565,13 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
             {/* Account selector */}
             <div>
               <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Source Account</label>
-              <select value={importAccountId} onChange={e => setImportAccountId(e.target.value)}
-                className="w-full bg-neutral-800 border border-emerald-600 rounded-xl px-3 py-2.5 text-white text-sm">
-                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              <AccountSelect
+                value={importAccountId}
+                onChange={setImportAccountId}
+                accounts={txAccounts}
+                placeholder="— Select account —"
+                className="border-emerald-600"
+              />
             </div>
 
             {/* Success message */}
