@@ -108,6 +108,7 @@ const CATEGORY_COLORS = {
   'Going Out': '#ef4444',
   'Purchases': '#06b6d4',
   'Travel': '#14b8a6',
+  'Loan': '#f97316',
   'Others': '#6b7280',
 };
 
@@ -124,6 +125,7 @@ const CATEGORY_EMOJI = {
   'Going Out': '🍻',
   'Purchases': '🛍️',
   'Travel': '✈️',
+  'Loan': '🤝',
   'Others': '📦',
 };
 

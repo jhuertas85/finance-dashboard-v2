@@ -3,7 +3,7 @@ import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import { formatDate, toAED, getCategoryEmoji } from './utils.js';
 
-const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Others'];
+const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Loan', 'Others'];
 const FX = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
 const CURRENCIES = ['AED', 'USD', 'EUR', 'PEN'];
 
@@ -96,6 +96,12 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
     return accountMap[idOrName]?.name || idOrName;
   }
 
+  function resolveAccountId(idOrName) {
+    if (!idOrName) return '';
+    if (accountMap[idOrName]) return idOrName;
+    return accounts.find(a => a.name === idOrName)?.id || '';
+  }
+
   function startEdit(tx) {
     setEditingTx(tx);
     setEditForm({
@@ -105,6 +111,9 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
       currency: tx.currency || 'AED',
       category: tx.category || 'Others',
       notes: tx.notes || '',
+      fromAccount: resolveAccountId(tx.fromAccount),
+      toAccount: resolveAccountId(tx.toAccount),
+      borrower: tx.borrower || '',
     });
     setError('');
   }
@@ -116,24 +125,36 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
     setSaving(true);
     setError('');
     try {
-      // Adjust account balance for amount/currency change
       const oldAED = toAED(editingTx.amount, editingTx.currency);
       const newAED = toAED(newAmount, editForm.currency);
-      const diff = newAED - oldAED;
 
-      if (Math.abs(diff) > 0.01) {
-        if (editingTx.type === 'expense' && editingTx.fromAccount) {
-          const acct = accountMap[editingTx.fromAccount];
-          if (acct) {
-            const delta = diff / (FX[acct.currency] || 1);
-            await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - delta });
+      if (editingTx.type === 'expense') {
+        const oldAcctId = resolveAccountId(editingTx.fromAccount);
+        const newAcctId = editForm.fromAccount;
+        if (oldAcctId === newAcctId) {
+          const acct = accountMap[oldAcctId];
+          if (acct && Math.abs(newAED - oldAED) > 0.001) {
+            await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - (newAED - oldAED) / (FX[acct.currency] || 1) });
           }
-        } else if (editingTx.type === 'income' && editingTx.toAccount) {
-          const acct = accountMap[editingTx.toAccount];
-          if (acct) {
-            const delta = diff / (FX[acct.currency] || 1);
-            await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance + delta });
+        } else {
+          const oldAcct = accountMap[oldAcctId];
+          const newAcct = accountMap[newAcctId];
+          if (oldAcct) await updateDoc(doc(db, 'accounts', oldAcct.id), { currentBalance: oldAcct.currentBalance + oldAED / (FX[oldAcct.currency] || 1) });
+          if (newAcct) await updateDoc(doc(db, 'accounts', newAcct.id), { currentBalance: newAcct.currentBalance - newAED / (FX[newAcct.currency] || 1) });
+        }
+      } else if (editingTx.type === 'income') {
+        const oldAcctId = resolveAccountId(editingTx.toAccount);
+        const newAcctId = editForm.toAccount;
+        if (oldAcctId === newAcctId) {
+          const acct = accountMap[oldAcctId];
+          if (acct && Math.abs(newAED - oldAED) > 0.001) {
+            await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance + (newAED - oldAED) / (FX[acct.currency] || 1) });
           }
+        } else {
+          const oldAcct = accountMap[oldAcctId];
+          const newAcct = accountMap[newAcctId];
+          if (oldAcct) await updateDoc(doc(db, 'accounts', oldAcct.id), { currentBalance: oldAcct.currentBalance - oldAED / (FX[oldAcct.currency] || 1) });
+          if (newAcct) await updateDoc(doc(db, 'accounts', newAcct.id), { currentBalance: newAcct.currentBalance + newAED / (FX[newAcct.currency] || 1) });
         }
       }
 
@@ -144,6 +165,9 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
         currency: editForm.currency,
         category: editForm.category,
         notes: editForm.notes.trim(),
+        ...(editingTx.type === 'expense' && editForm.fromAccount && { fromAccount: editForm.fromAccount }),
+        ...(editingTx.type === 'income' && editForm.toAccount && { toAccount: editForm.toAccount }),
+        ...(editForm.category === 'Loan' && { borrower: editForm.borrower || '' }),
       });
       setEditingTx(null);
     } catch (e) {
@@ -398,6 +422,40 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
                   className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
                   {CATEGORIES.map(cat => <option key={cat} value={cat}>{getCategoryEmoji(cat)} {cat}</option>)}
                 </select>
+              </div>
+            )}
+
+            {editingTx.type === 'expense' && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-bold block mb-1">Paid From</label>
+                <select value={editForm.fromAccount}
+                  onChange={e => setEditForm(f => ({ ...f, fromAccount: e.target.value }))}
+                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
+                  <option value="">— None —</option>
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {editingTx.type === 'income' && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-bold block mb-1">To Account</label>
+                <select value={editForm.toAccount}
+                  onChange={e => setEditForm(f => ({ ...f, toAccount: e.target.value }))}
+                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
+                  <option value="">— None —</option>
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {editForm.category === 'Loan' && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-bold block mb-1">Borrower</label>
+                <input type="text" value={editForm.borrower}
+                  onChange={e => setEditForm(f => ({ ...f, borrower: e.target.value }))}
+                  placeholder="Who borrowed this?"
+                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm" />
               </div>
             )}
 

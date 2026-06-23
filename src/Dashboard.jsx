@@ -14,7 +14,7 @@ import {
 import PayCreditModal from './PayCreditModal.jsx';
 import BudgetGrid from './BudgetGrid.jsx';
 
-const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Others'];
+const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Loan', 'Others'];
 
 function getMonthLabel(year, month) {
   return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
@@ -848,6 +848,40 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+
+      {/* ── Loans Owed ────────────────────────────────────────────────────────── */}
+      {(() => {
+        const loanTxs = transactions.filter(tx => tx.category === 'Loan');
+        if (loanTxs.length === 0) return null;
+        const byBorrower = {};
+        loanTxs.forEach(tx => {
+          const key = tx.borrower?.trim() || tx.notes?.trim() || 'Unknown';
+          const aed = toAED(tx.amount, tx.currency);
+          byBorrower[key] = (byBorrower[key] || 0) + (tx.type === 'income' ? -aed : aed);
+        });
+        const rows = Object.entries(byBorrower).filter(([, v]) => Math.abs(v) > 0.01).sort((a, b) => b[1] - a[1]);
+        const totalOwed = rows.filter(([, v]) => v > 0).reduce((s, [, v]) => s + v, 0);
+        if (rows.length === 0) return null;
+        return (
+          <div className="bg-neutral-950 border border-orange-900/40 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold uppercase text-gray-300">🤝 Loans Outstanding</h3>
+              <span className="text-orange-400 font-bold text-sm">AED {Math.round(totalOwed).toLocaleString()} owed to you</span>
+            </div>
+            <div className="space-y-2">
+              {rows.map(([borrower, net]) => (
+                <div key={borrower} className="flex items-center justify-between bg-neutral-900 rounded-xl px-4 py-2.5">
+                  <span className="text-sm text-gray-300 font-medium">{borrower}</span>
+                  <span className={`text-sm font-mono font-semibold ${net > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>
+                    {net > 0 ? '+' : ''}AED {Math.round(Math.abs(net)).toLocaleString()}
+                    <span className="text-xs text-gray-500 ml-1">{net > 0 ? 'owes you' : 'repaid'}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Budget Overview Grid */}
       <BudgetGrid budgets={budgets} transactions={transactions} selectedCurrency={selectedCurrency} />

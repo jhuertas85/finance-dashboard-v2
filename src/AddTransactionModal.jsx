@@ -3,7 +3,7 @@ import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import { toAED, getCategoryEmoji } from './utils.js';
 
-const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Others'];
+const CATEGORIES = ['Investments', 'Housing', 'Subs, Sports & Health', 'Food & Groceries', 'Car', 'Going Out', 'Purchases', 'Travel', 'Loan', 'Others'];
 const CURRENCIES = ['AED', 'USD', 'EUR', 'PEN'];
 const FX = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
 
@@ -173,6 +173,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const [fromAccount, setFromAccount] = useState(accounts[0]?.id || '');
   const [toAccount, setToAccount] = useState('');
   const [notes, setNotes] = useState('');
+  const [borrower, setBorrower] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
@@ -206,7 +207,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
     return thisMonthDescs.some(desc => desc === name || desc.includes(name) || name.includes(desc));
   }
 
-  function reset() { setDescription(''); setAmountExpr(''); setNotes(''); setError(''); }
+  function reset() { setDescription(''); setAmountExpr(''); setNotes(''); setBorrower(''); setError(''); }
 
   // ── Manual save
   async function save(keepOpen = false) {
@@ -228,6 +229,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
         toAccount: type === 'income' ? fromAccount : (type === 'transfer' ? toAccount : null),
         notes: notes.trim(),
         reconciled,
+        ...(category === 'Loan' && { borrower: borrower.trim() }),
       });
       const aedAmt = toAED(amount, currency);
       if (type === 'expense' && acct) await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - aedAmt / (FX[acct.currency] || 1) });
@@ -437,6 +439,14 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                   className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
                   {CATEGORIES.map(c => <option key={c} value={c}>{getCategoryEmoji(c)} {c}</option>)}
                 </select>
+              </div>
+            )}
+            {category === 'Loan' && type !== 'transfer' && (
+              <div>
+                <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Borrower</label>
+                <input type="text" value={borrower} onChange={e => setBorrower(e.target.value)}
+                  placeholder="Who borrowed this?"
+                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600" />
               </div>
             )}
             <div>
