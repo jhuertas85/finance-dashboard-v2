@@ -39,9 +39,9 @@ function evalExpr(str) {
   const s = String(str).trim();
   if (!s) return 0;
   if (/^[\d+\-*/.() ]+$/.test(s)) {
-    try { return Math.abs(Function('"use strict";return(' + s + ')')()) || 0; } catch {}
+    try { return Function('"use strict";return(' + s + ')')() || 0; } catch {}
   }
-  return Math.abs(parseFloat(s)) || 0;
+  return parseFloat(s) || 0;
 }
 
 function todayISO() {
@@ -222,7 +222,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   // ── Manual save
   async function save(keepOpen = false) {
     const amount = evalExpr(amountExpr);
-    if (!amount || amount <= 0) { setError('Enter a valid amount'); return; }
+    if (!amount || (type !== 'expense' && amount <= 0)) { setError('Enter a valid amount'); return; }
     const acct = accounts.find(a => a.id === fromAccount);
     if (type !== 'income' && !acct) { setError('Select an account'); return; }
     if (type === 'transfer' && !toAccount) { setError('Select a To account'); return; }
