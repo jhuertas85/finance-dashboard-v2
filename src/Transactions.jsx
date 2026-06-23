@@ -113,6 +113,7 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
       description: tx.description || '',
       amount: String(tx.amount),
       currency: tx.currency || 'AED',
+      amountTo: tx.amountTo != null ? String(tx.amountTo) : '',
       category: tx.category || 'Others',
       notes: tx.notes || '',
       fromAccount: resolveAccountId(tx.fromAccount),
@@ -126,39 +127,87 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
     if (!editingTx) return;
     const newAmount = parseFloat(editForm.amount);
     if (isNaN(newAmount) || newAmount <= 0) { setError('Enter a valid amount'); return; }
+
+    // Derive currencies from accounts (same convention as Add Transaction)
+    const editFromAcct = accountMap[editForm.fromAccount];
+    const editToAcct   = accountMap[editForm.toAccount];
+    const editFromCur  = editFromAcct?.currency || editingTx.currency || 'AED';
+    const editToCur    = editToAcct?.currency   || editingTx.currencyTo || editFromCur;
+    const editIsXCur   = editingTx.type === 'transfer' && !!editToAcct && editFromCur !== editToCur;
+
+    if (editIsXCur && (!editForm.amountTo || parseFloat(editForm.amountTo) <= 0)) {
+      setError('Enter the amount received'); return;
+    }
+
     setSaving(true);
     setError('');
     try {
-      const oldAED = toAED(editingTx.amount, editingTx.currency);
-      const newAED = toAED(newAmount, editForm.currency);
+      // ── helper: convert to AED via stored FX rates
+      const aed = (amt, cur) => toAED(amt, cur);
 
       if (editingTx.type === 'expense') {
-        const oldAcctId = resolveAccountId(editingTx.fromAccount);
-        const newAcctId = editForm.fromAccount;
-        if (oldAcctId === newAcctId) {
-          const acct = accountMap[oldAcctId];
-          if (acct && Math.abs(newAED - oldAED) > 0.001) {
+        const oldAED = aed(editingTx.amount, editingTx.currency);
+        const newAED = aed(newAmount, editFromCur);
+        const oldId = resolveAccountId(editingTx.fromAccount);
+        const newId = editForm.fromAccount;
+        if (oldId === newId) {
+          const acct = accountMap[oldId];
+          if (acct && Math.abs(newAED - oldAED) > 0.001)
             await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - (newAED - oldAED) / (FX[acct.currency] || 1) });
-          }
         } else {
-          const oldAcct = accountMap[oldAcctId];
-          const newAcct = accountMap[newAcctId];
-          if (oldAcct) await updateDoc(doc(db, 'accounts', oldAcct.id), { currentBalance: oldAcct.currentBalance + oldAED / (FX[oldAcct.currency] || 1) });
-          if (newAcct) await updateDoc(doc(db, 'accounts', newAcct.id), { currentBalance: newAcct.currentBalance - newAED / (FX[newAcct.currency] || 1) });
+          const o = accountMap[oldId], n = accountMap[newId];
+          if (o) await updateDoc(doc(db, 'accounts', o.id), { currentBalance: o.currentBalance + oldAED / (FX[o.currency] || 1) });
+          if (n) await updateDoc(doc(db, 'accounts', n.id), { currentBalance: n.currentBalance - newAED / (FX[n.currency] || 1) });
         }
+
       } else if (editingTx.type === 'income') {
-        const oldAcctId = resolveAccountId(editingTx.toAccount);
-        const newAcctId = editForm.toAccount;
-        if (oldAcctId === newAcctId) {
-          const acct = accountMap[oldAcctId];
-          if (acct && Math.abs(newAED - oldAED) > 0.001) {
+        const oldAED = aed(editingTx.amount, editingTx.currency);
+        const newAED = aed(newAmount, editFromCur);
+        const oldId = resolveAccountId(editingTx.toAccount);
+        const newId = editForm.toAccount;
+        if (oldId === newId) {
+          const acct = accountMap[oldId];
+          if (acct && Math.abs(newAED - oldAED) > 0.001)
             await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance + (newAED - oldAED) / (FX[acct.currency] || 1) });
-          }
         } else {
-          const oldAcct = accountMap[oldAcctId];
-          const newAcct = accountMap[newAcctId];
-          if (oldAcct) await updateDoc(doc(db, 'accounts', oldAcct.id), { currentBalance: oldAcct.currentBalance - oldAED / (FX[oldAcct.currency] || 1) });
-          if (newAcct) await updateDoc(doc(db, 'accounts', newAcct.id), { currentBalance: newAcct.currentBalance + newAED / (FX[newAcct.currency] || 1) });
+          const o = accountMap[oldId], n = accountMap[newId];
+          if (o) await updateDoc(doc(db, 'accounts', o.id), { currentBalance: o.currentBalance - oldAED / (FX[o.currency] || 1) });
+          if (n) await updateDoc(doc(db, 'accounts', n.id), { currentBalance: n.currentBalance + newAED / (FX[n.currency] || 1) });
+        }
+
+      } else if (editingTx.type === 'transfer') {
+        const oldFromId = resolveAccountId(editingTx.fromAccount);
+        const oldToId   = resolveAccountId(editingTx.toAccount);
+        const newFromId = editForm.fromAccount;
+        const newToId   = editForm.toAccount;
+
+        const oldFromAED = aed(editingTx.amount, editingTx.currency);
+        const oldToAmt   = editingTx.amountTo ?? editingTx.amount;
+        const oldToCur   = editingTx.currencyTo || editingTx.currency;
+        const oldToAED   = aed(oldToAmt, oldToCur);
+
+        const newFromAED = aed(newAmount, editFromCur);
+        const newToAmt   = editIsXCur ? parseFloat(editForm.amountTo) : newAmount;
+        const newToAED   = aed(newToAmt, editToCur);
+
+        const oF = accountMap[oldFromId], nF = accountMap[newFromId];
+        const oT = accountMap[oldToId],   nT = accountMap[newToId];
+
+        // From account
+        if (oldFromId === newFromId) {
+          if (oF && Math.abs(newFromAED - oldFromAED) > 0.001)
+            await updateDoc(doc(db, 'accounts', oF.id), { currentBalance: oF.currentBalance - (newFromAED - oldFromAED) / (FX[oF.currency] || 1) });
+        } else {
+          if (oF) await updateDoc(doc(db, 'accounts', oF.id), { currentBalance: oF.currentBalance + oldFromAED / (FX[oF.currency] || 1) });
+          if (nF) await updateDoc(doc(db, 'accounts', nF.id), { currentBalance: nF.currentBalance - newFromAED / (FX[nF.currency] || 1) });
+        }
+        // To account
+        if (oldToId === newToId) {
+          if (oT && Math.abs(newToAED - oldToAED) > 0.001)
+            await updateDoc(doc(db, 'accounts', oT.id), { currentBalance: oT.currentBalance + (newToAED - oldToAED) / (FX[oT.currency] || 1) });
+        } else {
+          if (oT) await updateDoc(doc(db, 'accounts', oT.id), { currentBalance: oT.currentBalance - oldToAED / (FX[oT.currency] || 1) });
+          if (nT) await updateDoc(doc(db, 'accounts', nT.id), { currentBalance: nT.currentBalance + newToAED / (FX[nT.currency] || 1) });
         }
       }
 
@@ -166,11 +215,15 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
         date: new Date(editForm.date + 'T12:00:00').toISOString(),
         description: editForm.description.trim(),
         amount: newAmount,
-        currency: editForm.currency,
-        category: editForm.category,
+        currency: editFromCur,
+        category: editingTx.type === 'transfer' ? 'Transfer' : editForm.category,
         notes: editForm.notes.trim(),
-        ...(editingTx.type === 'expense' && editForm.fromAccount && { fromAccount: editForm.fromAccount }),
-        ...(editingTx.type === 'income' && editForm.toAccount && { toAccount: editForm.toAccount }),
+        ...(editingTx.type === 'expense'  && editForm.fromAccount && { fromAccount: editForm.fromAccount }),
+        ...(editingTx.type === 'income'   && editForm.toAccount   && { toAccount:   editForm.toAccount }),
+        ...(editingTx.type === 'transfer' && editForm.fromAccount && { fromAccount: editForm.fromAccount }),
+        ...(editingTx.type === 'transfer' && editForm.toAccount   && { toAccount:   editForm.toAccount }),
+        ...(editIsXCur && { amountTo: parseFloat(editForm.amountTo), currencyTo: editToCur }),
+        ...(!editIsXCur && editingTx.type === 'transfer' && { amountTo: null, currencyTo: null }),
         ...(editForm.category === 'Loan' && { borrower: editForm.borrower || '' }),
       });
       setEditingTx(null);
@@ -195,9 +248,12 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
         if (acct) await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - aed / (FX[acct.currency] || 1) });
       } else if (tx.type === 'transfer') {
         const from = accountMap[tx.fromAccount];
-        const to = accountMap[tx.toAccount];
-        if (from) await updateDoc(doc(db, 'accounts', from.id), { currentBalance: from.currentBalance + aed / (FX[from.currency] || 1) });
-        if (to) await updateDoc(doc(db, 'accounts', to.id), { currentBalance: to.currentBalance - aed / (FX[to.currency] || 1) });
+        const to   = accountMap[tx.toAccount];
+        const fromAED = toAED(tx.amount, tx.currency);
+        const toAmt   = tx.amountTo ?? tx.amount;
+        const toAED_  = toAED(toAmt, tx.currencyTo || tx.currency);
+        if (from) await updateDoc(doc(db, 'accounts', from.id), { currentBalance: from.currentBalance + fromAED / (FX[from.currency] || 1) });
+        if (to)   await updateDoc(doc(db, 'accounts', to.id),   { currentBalance: to.currentBalance   - toAED_  / (FX[to.currency]   || 1) });
       }
       await deleteDoc(doc(db, 'transactions', tx.id));
       setDeletingTx(null);
@@ -394,7 +450,20 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
       )}
 
       {/* Edit modal */}
-      {editingTx && (
+      {editingTx && (() => {
+        // Derive currencies from selected accounts in edit form
+        const editFromAcct = accountMap[editForm.fromAccount];
+        const editToAcct   = accountMap[editForm.toAccount];
+        const editFromCur  = editFromAcct?.currency || editingTx.currency || 'AED';
+        const editToCur    = editToAcct?.currency   || editingTx.currencyTo || editFromCur;
+        const editIsXCur   = editingTx.type === 'transfer' && !!editToAcct && editFromCur !== editToCur;
+
+        // Currency badge to show next to the amount (always follows the account)
+        const amtCurrency = editingTx.type === 'income'
+          ? (editFromAcct?.currency || editingTx.currency || 'AED')
+          : editFromCur;
+
+        return (
         <div className="fixed inset-0 bg-black/80 flex items-start justify-center z-50 p-4 pt-16 overflow-y-auto">
           <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 max-w-md w-full space-y-4">
             <div className="flex items-center justify-between">
@@ -417,18 +486,37 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
             </div>
 
             <div>
-              <label className="text-xs text-gray-500 uppercase font-bold block mb-1">Amount</label>
+              <label className="text-xs text-gray-500 uppercase font-bold block mb-1">
+                {editIsXCur ? 'Amount Sent' : 'Amount'}
+              </label>
               <div className="flex gap-2">
                 <input type="number" value={editForm.amount} min="0"
                   onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
                   className="flex-1 bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm" />
-                <select value={editForm.currency}
-                  onChange={e => setEditForm(f => ({ ...f, currency: e.target.value }))}
-                  className="bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm">
-                  {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-                </select>
+                <span className="bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-gray-400 text-sm font-mono min-w-[64px] text-center">
+                  {amtCurrency}
+                </span>
               </div>
             </div>
+
+            {editIsXCur && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase font-bold block mb-1">Amount Received</label>
+                <div className="flex gap-2">
+                  <input type="number" value={editForm.amountTo} min="0"
+                    onChange={e => setEditForm(f => ({ ...f, amountTo: e.target.value }))}
+                    className="flex-1 bg-neutral-800 border border-emerald-700 rounded-xl px-3 py-2.5 text-white text-sm" />
+                  <span className="bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-gray-400 text-sm font-mono min-w-[64px] text-center">
+                    {editToCur}
+                  </span>
+                </div>
+                {editForm.amount && editForm.amountTo && parseFloat(editForm.amount) > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Implied rate: 1 {editFromCur} = {(parseFloat(editForm.amountTo) / parseFloat(editForm.amount)).toFixed(4)} {editToCur}
+                  </p>
+                )}
+              </div>
+            )}
 
             {editingTx.type !== 'transfer' && (
               <div>
@@ -441,9 +529,11 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
               </div>
             )}
 
-            {editingTx.type === 'expense' && (
+            {(editingTx.type === 'expense' || editingTx.type === 'transfer') && (
               <div>
-                <label className="text-xs text-gray-500 uppercase font-bold block mb-1">Paid From</label>
+                <label className="text-xs text-gray-500 uppercase font-bold block mb-1">
+                  {editingTx.type === 'transfer' ? 'From Account' : 'Paid From'}
+                </label>
                 <AccountSelect
                   value={editForm.fromAccount}
                   onChange={v => setEditForm(f => ({ ...f, fromAccount: v }))}
@@ -453,13 +543,13 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
               </div>
             )}
 
-            {editingTx.type === 'income' && (
+            {(editingTx.type === 'income' || editingTx.type === 'transfer') && (
               <div>
                 <label className="text-xs text-gray-500 uppercase font-bold block mb-1">To Account</label>
                 <AccountSelect
                   value={editForm.toAccount}
                   onChange={v => setEditForm(f => ({ ...f, toAccount: v }))}
-                  accounts={txAccounts}
+                  accounts={txAccounts.filter(a => a.id !== editForm.fromAccount)}
                   placeholder="— None —"
                 />
               </div>
@@ -496,7 +586,8 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
