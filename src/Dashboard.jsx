@@ -53,6 +53,12 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const [displayMode, setDisplayMode] = useState('budget'); // 'budget' | 'absolute'
   const [payingCard, setPayingCard] = useState(null);
   const [wealthRange, setWealthRange] = useState('12M');
+  const [monthlyIncomeGoal, setMonthlyIncomeGoal] = useState(() => {
+    const stored = localStorage.getItem('monthlyIncomeGoal');
+    return stored ? parseFloat(stored) : 0;
+  });
+  const [editingIncomeGoal, setEditingIncomeGoal] = useState(false);
+  const [incomeGoalInput, setIncomeGoalInput] = useState('');
   const spendingDetailRef = useRef(null);
 
   const dayProgress = getDayProgress();
@@ -253,8 +259,9 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     const pastKeys = Object.keys(dataMap).filter(k => k < currentKey);
     const incomeMonths = pastKeys.filter(k => dataMap[k].income > 0);
     const expMonths = pastKeys.filter(k => dataMap[k].expenses > 0);
-    const estIncome = incomeMonths.length > 0
+    const avgIncome = incomeMonths.length > 0
       ? incomeMonths.reduce((s, k) => s + dataMap[k].income, 0) / incomeMonths.length : 0;
+    const estIncome = monthlyIncomeGoal > 0 ? monthlyIncomeGoal : avgIncome;
     const estExpenses = expMonths.length > 0
       ? expMonths.reduce((s, k) => s + dataMap[k].expenses, 0) / expMonths.length : 0;
     function getMonthBudget(m) {
@@ -279,7 +286,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         label: new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
       };
     });
-  }, [transactions, budgets]);
+  }, [transactions, budgets, monthlyIncomeGoal]);
 
   const wealthData = useMemo(() => {
     const makeKey = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
@@ -745,7 +752,44 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-sm font-bold uppercase text-gray-300">Monthly Flow — 2026</h3>
-          <span className="text-xs text-gray-600">Click a month to drill in · future months = estimated</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-600">Click a month to drill in · future months = estimated</span>
+            {editingIncomeGoal ? (
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-500">Est. income/mo:</span>
+                <input
+                  type="number"
+                  value={incomeGoalInput}
+                  onChange={e => setIncomeGoalInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const v = parseFloat(incomeGoalInput) || 0;
+                      setMonthlyIncomeGoal(v);
+                      localStorage.setItem('monthlyIncomeGoal', String(v));
+                      setEditingIncomeGoal(false);
+                    }
+                    if (e.key === 'Escape') setEditingIncomeGoal(false);
+                  }}
+                  onBlur={() => {
+                    const v = parseFloat(incomeGoalInput) || 0;
+                    setMonthlyIncomeGoal(v);
+                    localStorage.setItem('monthlyIncomeGoal', String(v));
+                    setEditingIncomeGoal(false);
+                  }}
+                  autoFocus
+                  className="w-24 bg-neutral-800 border border-emerald-700 rounded px-2 py-0.5 text-xs text-white text-right"
+                />
+                <span className="text-xs text-gray-500">AED</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setIncomeGoalInput(String(monthlyIncomeGoal || '')); setEditingIncomeGoal(true); }}
+                className="text-xs text-gray-600 hover:text-emerald-400 transition border border-neutral-800 hover:border-neutral-600 rounded px-2 py-0.5"
+              >
+                {monthlyIncomeGoal > 0 ? `Est. income: AED ${monthlyIncomeGoal.toLocaleString()}/mo` : 'Set expected income →'}
+              </button>
+            )}
+          </div>
         </div>
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={monthlyFlowData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}
