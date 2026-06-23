@@ -116,7 +116,8 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
       amountTo: tx.amountTo != null ? String(tx.amountTo) : '',
       category: tx.category || 'Others',
       notes: tx.notes || '',
-      fromAccount: resolveAccountId(tx.fromAccount),
+      // For old negative-expense entries that stored account in toAccount instead of fromAccount
+      fromAccount: resolveAccountId(tx.fromAccount) || (tx.type === 'expense' ? resolveAccountId(tx.toAccount) : ''),
       toAccount: resolveAccountId(tx.toAccount),
       borrower: tx.borrower || '',
     });
@@ -126,7 +127,7 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
   async function saveEdit() {
     if (!editingTx) return;
     const newAmount = parseFloat(editForm.amount);
-    if (isNaN(newAmount) || newAmount <= 0) { setError('Enter a valid amount'); return; }
+    if (isNaN(newAmount) || (editingTx.type !== 'expense' && newAmount <= 0)) { setError('Enter a valid amount'); return; }
 
     // Derive currencies from accounts (same convention as Add Transaction)
     const editFromAcct = accountMap[editForm.fromAccount];
@@ -148,7 +149,8 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
       if (editingTx.type === 'expense') {
         const oldAED = aed(editingTx.amount, editingTx.currency);
         const newAED = aed(newAmount, editFromCur);
-        const oldId = resolveAccountId(editingTx.fromAccount);
+        // Old entries may have stored account in toAccount instead of fromAccount
+        const oldId = resolveAccountId(editingTx.fromAccount) || resolveAccountId(editingTx.toAccount);
         const newId = editForm.fromAccount;
         if (oldId === newId) {
           const acct = accountMap[oldId];
@@ -218,7 +220,7 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
         currency: editFromCur,
         category: editingTx.type === 'transfer' ? 'Transfer' : editForm.category,
         notes: editForm.notes.trim(),
-        ...(editingTx.type === 'expense'  && editForm.fromAccount && { fromAccount: editForm.fromAccount }),
+        ...(editingTx.type === 'expense'  && { fromAccount: editForm.fromAccount || null }),
         ...(editingTx.type === 'income'   && editForm.toAccount   && { toAccount:   editForm.toAccount }),
         ...(editingTx.type === 'transfer' && editForm.fromAccount && { fromAccount: editForm.fromAccount }),
         ...(editingTx.type === 'transfer' && editForm.toAccount   && { toAccount:   editForm.toAccount }),
@@ -240,8 +242,9 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
     setError('');
     try {
       const aed = toAED(tx.amount, tx.currency);
-      if (tx.type === 'expense' && tx.fromAccount) {
-        const acct = accountMap[tx.fromAccount];
+      if (tx.type === 'expense') {
+        const acctId = resolveAccountId(tx.fromAccount) || resolveAccountId(tx.toAccount);
+        const acct = accountMap[acctId];
         if (acct) await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance + aed / (FX[acct.currency] || 1) });
       } else if (tx.type === 'income' && tx.toAccount) {
         const acct = accountMap[tx.toAccount];
@@ -367,11 +370,12 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
               ) : filtered.map(tx => {
                 const fromName = getAccountName(tx.fromAccount);
                 const toName = getAccountName(tx.toAccount);
+                const isRefund = tx.type === 'expense' && tx.amount < 0;
                 const accountDisplay = tx.type === 'transfer'
                   ? `${fromName || '?'} → ${toName || '?'}`
                   : tx.type === 'income'
                   ? toName
-                  : fromName;
+                  : (fromName || (isRefund ? toName : null));
 
                 return (
                   <tr key={tx.id} className="border-b border-neutral-900 hover:bg-neutral-900/40 group">
@@ -385,15 +389,15 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
                     <td className="py-2.5 px-3 whitespace-nowrap text-[11px]">
                       {accountDisplay ? (
                         <span className="flex items-center gap-1.5 text-gray-500">
-                          <AccountBadge name={tx.type === 'transfer' ? (getAccountName(tx.fromAccount) || '') : accountDisplay} size="sm" />
+                          <AccountBadge name={tx.type === 'transfer' ? (getAccountName(tx.fromAccount) || '') : (accountDisplay || '')} size="sm" />
                           {accountDisplay}
                         </span>
                       ) : '—'}
                     </td>
                     <td className={`py-2.5 px-3 text-right font-mono font-semibold whitespace-nowrap ${
-                      tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-blue-400' : 'text-red-400'
+                      tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-blue-400' : isRefund ? 'text-purple-400' : 'text-red-400'
                     }`}>
-                      {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '' : '−'}{tx.currency} {Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {tx.type === 'income' ? '+' : tx.type === 'transfer' ? '' : isRefund ? '+' : '−'}{tx.currency} {Math.abs(Number(tx.amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       {tx.type === 'transfer' && tx.amountTo && tx.currencyTo && tx.currencyTo !== tx.currency && (
                         <span className="block text-[10px] text-blue-300 font-normal">
                           → {tx.currencyTo} {Number(tx.amountTo).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -490,7 +494,7 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
                 {editIsXCur ? 'Amount Sent' : 'Amount'}
               </label>
               <div className="flex gap-2">
-                <input type="number" value={editForm.amount} min="0"
+                <input type="number" value={editForm.amount}
                   onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
                   className="flex-1 bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm" />
                 <span className="bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-gray-400 text-sm font-mono min-w-[64px] text-center">
