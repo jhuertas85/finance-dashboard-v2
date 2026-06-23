@@ -582,9 +582,9 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                 ).length;
                 return (
                   <button key={acc.id} onClick={() => setPayingCard(acc)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition">
-                    <span>💳 Pay {acc.name}</span>
-                    <span>{pendingCount} charge{pendingCount !== 1 ? 's' : ''} · {fmt(Math.abs(toAED(acc.currentBalance, acc.currency)))} →</span>
+                    className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition">
+                    <span className="truncate min-w-0">💳 Pay {acc.name}</span>
+                    <span className="shrink-0 whitespace-nowrap">{pendingCount} charge{pendingCount !== 1 ? 's' : ''} · {fmt(Math.abs(toAED(acc.currentBalance, acc.currency)))} →</span>
                   </button>
                 );
               })}

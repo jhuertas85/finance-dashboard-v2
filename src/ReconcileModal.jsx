@@ -40,6 +40,7 @@ export default function ReconcileModal({ accounts, onClose }) {
       const adjAmountInCurrency = Math.abs(realVal - currentInCurrency);
 
       if (!silent) {
+        const isCreditCardExpense = diff < 0 && account.netWorthBucket === 'debt';
         await addDoc(collection(db, 'transactions'), {
           date: new Date().toISOString(),
           description: `Reconciliation — ${account.name}`,
@@ -50,6 +51,7 @@ export default function ReconcileModal({ accounts, onClose }) {
           fromAccount: diff < 0 ? account.id : null,
           toAccount: diff >= 0 ? account.id : null,
           notes: 'Reconciliation adjustment',
+          ...(isCreditCardExpense && { reconciled: false }),
         });
       }
 

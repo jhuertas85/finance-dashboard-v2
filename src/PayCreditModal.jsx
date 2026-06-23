@@ -25,7 +25,14 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
 
   const hasLinkedTxs = pendingTxs.length > 0;
 
+  // Any gap between outstanding balance and sum of tracked charges
+  // (e.g. reconciliation adjustments, transactions without reconciled flag)
+  const trackedTotal = pendingTxs.reduce((sum, tx) => sum + toAED(tx.amount, tx.currency), 0);
+  const untrackedAED = outstandingAED - trackedTotal;
+  const hasUntracked = untrackedAED > 0.01;
+
   const [selected, setSelected] = useState(new Set(pendingTxs.map(t => t.id)));
+  const [includeUntracked, setIncludeUntracked] = useState(true);
   const [payFromId, setPayFromId] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -36,10 +43,14 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
   );
 
   const selectedTxs = pendingTxs.filter(t => selected.has(t.id));
-  // Amount to pay: sum of selected txs if linked txs exist, otherwise full outstanding balance
-  const payAmountAED = hasLinkedTxs
-    ? selectedTxs.reduce((sum, tx) => sum + toAED(tx.amount, tx.currency), 0)
+  const selectedTotal = selectedTxs.reduce((sum, tx) => sum + toAED(tx.amount, tx.currency), 0);
+
+  const payAmountAED = (hasLinkedTxs || hasUntracked)
+    ? selectedTotal + (hasUntracked && includeUntracked ? untrackedAED : 0)
     : outstandingAED;
+
+  const allTxsSelected = selected.size === pendingTxs.length;
+  const allSelected = allTxsSelected && (!hasUntracked || includeUntracked);
 
   function toggleTx(id) {
     setSelected(prev => {
@@ -50,7 +61,13 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
   }
 
   function toggleAll() {
-    setSelected(selected.size === pendingTxs.length ? new Set() : new Set(pendingTxs.map(t => t.id)));
+    if (allSelected) {
+      setSelected(new Set());
+      setIncludeUntracked(false);
+    } else {
+      setSelected(new Set(pendingTxs.map(t => t.id)));
+      if (hasUntracked) setIncludeUntracked(true);
+    }
   }
 
   async function pay() {
@@ -88,9 +105,7 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
       const payFromNewBal = payFromAccount.currentBalance - (payAmountAED / (FX[payFromAccount.currency] || 1));
       batch.update(doc(db, 'accounts', payFromId), { currentBalance: payFromNewBal });
 
-      // Update credit card balance toward 0
-      // When paying all pending charges, zero out exactly to absorb any reconciliation drift
-      const allSelected = hasLinkedTxs && selected.size === pendingTxs.length;
+      // Update credit card balance; zero exactly when paying everything to avoid drift
       const cardNewBal = allSelected ? 0 : creditCard.currentBalance + (payAmountAED / (FX[creditCard.currency] || 1));
       batch.update(doc(db, 'accounts', creditCard.id), { currentBalance: cardNewBal });
 
@@ -102,7 +117,9 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
     setSaving(false);
   }
 
-  const canPay = payFromId && payAmountAED > 0 && (!hasLinkedTxs || selectedTxs.length > 0);
+  const canPay = payFromId && payAmountAED > 0 && (selectedTxs.length > 0 || (!hasLinkedTxs) || (hasUntracked && includeUntracked));
+
+  const totalItemCount = pendingTxs.length + (hasUntracked ? 1 : 0);
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -135,7 +152,7 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {!hasLinkedTxs ? (
+              {!hasLinkedTxs && !hasUntracked ? (
                 /* No individual transactions tracked — direct balance payment */
                 <div className="bg-neutral-800/50 border border-neutral-700 rounded-xl p-4 text-sm text-gray-400">
                   <p className="font-medium text-gray-300 mb-1">No individual charges tracked</p>
@@ -148,11 +165,12 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
                 /* Linked transactions found — show with checkboxes */
                 <>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-gray-500 uppercase font-bold">{pendingTxs.length} pending charge{pendingTxs.length !== 1 ? 's' : ''}</span>
+                    <span className="text-xs text-gray-500 uppercase font-bold">{totalItemCount} pending charge{totalItemCount !== 1 ? 's' : ''}</span>
                     <button onClick={toggleAll} className="text-xs text-emerald-400 hover:text-emerald-300">
-                      {selected.size === pendingTxs.length ? 'Deselect all' : 'Select all'}
+                      {allSelected ? 'Deselect all' : 'Select all'}
                     </button>
                   </div>
+
                   {pendingTxs.map(tx => (
                     <label key={tx.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition ${
                       selected.has(tx.id) ? 'bg-emerald-900/20 border-emerald-800' : 'bg-neutral-800 border-neutral-700'
@@ -175,15 +193,36 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
                       </span>
                     </label>
                   ))}
+
+                  {/* Untracked / reconciliation gap row */}
+                  {hasUntracked && (
+                    <label className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition ${
+                      includeUntracked ? 'bg-amber-900/20 border-amber-800' : 'bg-neutral-800 border-neutral-700'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={includeUntracked}
+                        onChange={() => setIncludeUntracked(v => !v)}
+                        className="accent-amber-500 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-gray-300 text-sm">Other charges / reconciliation</p>
+                        <p className="text-gray-500 text-xs">Balance adjustments not individually tracked</p>
+                      </div>
+                      <span className="text-amber-400 text-sm font-mono shrink-0">
+                        {fmt2(untrackedAED, 'AED')}
+                      </span>
+                    </label>
+                  )}
                 </>
               )}
             </div>
 
             {/* Payment footer — always visible */}
             <div className="p-4 border-t border-neutral-800 space-y-3">
-              {hasLinkedTxs && (
+              {(hasLinkedTxs || hasUntracked) && (
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-400">{selectedTxs.length} selected</span>
+                  <span className="text-gray-400">{selectedTxs.length + (hasUntracked && includeUntracked ? 1 : 0)} selected</span>
                   <span className="text-white font-bold">{fmt2(payAmountAED, 'AED')}</span>
                 </div>
               )}
