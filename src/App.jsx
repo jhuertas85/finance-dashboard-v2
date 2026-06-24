@@ -3,6 +3,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import Dashboard from './Dashboard.jsx';
 import Transactions from './Transactions.jsx';
+import Investments from './Investments.jsx';
 import AddTransactionModal from './AddTransactionModal.jsx';
 import ReconcileModal from './ReconcileModal.jsx';
 
@@ -10,6 +11,7 @@ const CURRENCIES = ['AED', 'USD', 'EUR', 'PEN'];
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'transactions', label: 'Transactions', icon: '📋' },
+  { id: 'investments', label: 'Investments', icon: '📈' },
 ];
 
 export default function App() {
@@ -208,6 +210,7 @@ export default function App() {
             onClearExternalFilter={() => setTxFilter(null)}
           />
         )}
+        {activeTab === 'investments' && <Investments />}
       </main>
 
       {showAddTx && (
