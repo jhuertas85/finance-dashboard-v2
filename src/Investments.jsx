@@ -37,27 +37,31 @@ function fmtShares(n) {
 // ─── Seed data ────────────────────────────────────────────────────────────────
 const SEED = {
   positions: [
-    // WIO
-    { id: 'amd', ticker: 'AMD', name: 'Adv. Micro Devices', platform: 'WIO', type: 'STK', shares: 25.40, price: 511.57, costPerShare: 137.86, currency: 'USD', addLevels: [{ price: 440, amount: '$1,000' }, { price: 400, amount: '$1,500' }], trimLevels: [{ price: 575, action: 'sell 3 sh' }, { price: 640, action: 'sell 3 sh' }], status: 'HOLD', notes: 'Core winner — only trim above target' },
-    { id: 'nvda', ticker: 'NVDA', name: 'NVIDIA', platform: 'WIO', type: 'STK', shares: 30.00, price: 205.19, costPerShare: 179.92, currency: 'USD', addLevels: [{ price: 185, amount: '$1,500' }, { price: 165, amount: '$1,500' }], trimLevels: [{ price: 285, action: 'trim 6 sh' }, { price: 330, action: 'trim 6 sh' }], status: 'HOLD', notes: 'Conviction add name' },
-    { id: 'avgo', ticker: 'AVGO', name: 'Broadcom', platform: 'WIO', type: 'STK', shares: 6.00, price: 382.07, costPerShare: 382.07, currency: 'USD', addLevels: [{ price: 350, amount: '$1,200' }, { price: 320, amount: '$1,200' }], trimLevels: [{ price: 490, action: 'trim 2 sh' }], status: 'HOLD', notes: 'Custom AI silicon' },
-    { id: 'meta', ticker: 'META', name: 'Meta Platforms', platform: 'WIO', type: 'STK', shares: 5.01, price: 566.98, costPerShare: 584.73, currency: 'USD', addLevels: [{ price: 520, amount: '$1,000' }, { price: 480, amount: '$1,000' }], trimLevels: [{ price: 720, action: 'trim 1.5 sh' }], status: 'HOLD', notes: 'Cheapest mega-cap · near add' },
-    { id: 'amzn', ticker: 'AMZN', name: 'Amazon', platform: 'WIO', type: 'STK', shares: 10.01, price: 238.55, costPerShare: 205.69, currency: 'USD', addLevels: [{ price: 215, amount: '$800' }], trimLevels: [{ price: 290, action: 'trim 3 sh' }], status: 'HOLD', notes: '' },
-    { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 10.03, price: 102.15, costPerShare: 101.49, currency: 'USD', addLevels: [{ price: 90, amount: '$500' }], trimLevels: [{ price: 140, action: 'trim 3 sh' }], status: 'HOLD', notes: 'Enterprise AI' },
-    { id: 'cake', ticker: 'CAKE', name: 'Cheesecake Factory', platform: 'WIO', type: 'STK', shares: 11.00, price: 75.28, costPerShare: 48.50, currency: 'USD', addLevels: [], trimLevels: [{ price: 90, action: 'sell 5 sh' }], status: 'HOLD', notes: 'No adds · trim into strength' },
-    { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 809.73, costPerShare: 809.73, currency: 'USD', addLevels: [], trimLevels: [], status: 'ACCUMULATE', notes: 'The base — add on dips, never trim' },
-    { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.0754, price: 68.20, costPerShare: 161.00, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', notes: 'Speculative bucket · separate cash' },
+    // WIO — stocks & ETF (prices from screenshots 23 Jun 2026)
+    { id: 'amd', ticker: 'AMD', name: 'Adv. Micro Devices', platform: 'WIO', type: 'STK', shares: 25.39630338, price: 551.63, costPerShare: 137.91, currency: 'USD', addLevels: [{ price: 440, amount: '$1,000' }, { price: 400, amount: '$1,500' }], trimLevels: [{ price: 575, action: 'sell 3 sh' }, { price: 640, action: 'sell 3 sh' }], status: 'HOLD', notes: 'Core winner — only trim above target' },
+    { id: 'nvda', ticker: 'NVDA', name: 'NVIDIA', platform: 'WIO', type: 'STK', shares: 29.79087899, price: 208.65, costPerShare: 181.18, currency: 'USD', addLevels: [{ price: 185, amount: '$1,500' }, { price: 165, amount: '$1,500' }], trimLevels: [{ price: 285, action: 'trim 6 sh' }, { price: 330, action: 'trim 6 sh' }], status: 'HOLD', notes: 'Conviction add name' },
+    { id: 'avgo', ticker: 'AVGO', name: 'Broadcom', platform: 'WIO', type: 'STK', shares: 5.79772382, price: 392.13, costPerShare: 395.40, currency: 'USD', addLevels: [{ price: 350, amount: '$1,200' }, { price: 320, amount: '$1,200' }], trimLevels: [{ price: 490, action: 'trim 2 sh' }], status: 'HOLD', notes: 'Custom AI silicon' },
+    { id: 'meta', ticker: 'META', name: 'Meta Platforms', platform: 'WIO', type: 'STK', shares: 4.93349486, price: 563.85, costPerShare: 593.78, currency: 'USD', addLevels: [{ price: 520, amount: '$1,000' }, { price: 480, amount: '$1,000' }], trimLevels: [{ price: 720, action: 'trim 1.5 sh' }], status: 'HOLD', notes: 'Cheapest mega-cap' },
+    { id: 'amzn', ticker: 'AMZN', name: 'Amazon', platform: 'WIO', type: 'STK', shares: 9.89225353, price: 232.79, costPerShare: 208.12, currency: 'USD', addLevels: [{ price: 215, amount: '$800' }], trimLevels: [{ price: 290, action: 'trim 3 sh' }], status: 'HOLD', notes: '' },
+    { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 93.01, costPerShare: 102.81, currency: 'USD', addLevels: [{ price: 90, amount: '$500' }], trimLevels: [{ price: 140, action: 'trim 3 sh' }], status: 'HOLD', notes: 'Enterprise AI' },
+    { id: 'cake', ticker: 'CAKE', name: 'Cheesecake Factory', platform: 'WIO', type: 'STK', shares: 11, price: 76.91, costPerShare: 48.50, currency: 'USD', addLevels: [], trimLevels: [{ price: 90, action: 'sell 5 sh' }], status: 'HOLD', notes: 'No adds · trim into strength' },
+    { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 795.24, costPerShare: 809.73, currency: 'USD', addLevels: [], trimLevels: [], status: 'ACCUMULATE', notes: 'The base — add on dips, never trim' },
+    { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.07539626, price: 69.10, costPerShare: 161.14, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', notes: 'Speculative · separate cash' },
+    // WIO — managed products
+    { id: 'wio-wealth', ticker: 'WIO-W', name: 'WIO Wealth · Travel Goal', platform: 'WIO', type: 'WLT', shares: 1, price: 2511.07, costPerShare: 2297.44, currency: 'USD', addLevels: [], trimLevels: [], status: 'HOLD', notes: 'Managed · travel goal · target $10k' },
+    { id: 'wio-growth', ticker: 'WIO-G', name: 'WIO Growth Accelerator', platform: 'WIO', type: 'WLT', shares: 1, price: 1950.91, costPerShare: 2000, currency: 'USD', addLevels: [], trimLevels: [], status: 'HOLD', notes: 'Managed · growth accelerator' },
     // DH / Talabat
-    { id: 'dher', ticker: 'DHER', name: 'Delivery Hero SE', platform: 'DH/Talabat', type: 'STK', shares: 1683, price: 36.89, costPerShare: 0, currency: 'EUR', addLevels: [], trimLevels: [{ price: 40, action: 'trim into deal strength' }], status: 'WATCH', isGrant: true, notes: 'Cost-free grant · event-driven M&A · reduce into strength' },
-    { id: 'talabat', ticker: 'TALABAT', name: 'Talabat Holding', platform: 'DH/Talabat', type: 'STK', shares: 6250, price: 0.96, costPerShare: 0.4357, currency: 'AED', addLevels: [], trimLevels: [], status: 'WATCH', isEmployerStock: true, notes: 'Employer stock · DFM listed · hold, working there · manual price' },
+    { id: 'dher', ticker: 'DHER', name: 'Delivery Hero SE', platform: 'DH/Talabat', type: 'STK', shares: 998, price: 36.89, costPerShare: 0, currency: 'EUR', addLevels: [], trimLevels: [{ price: 40, action: 'trim into deal strength' }], status: 'WATCH', isGrant: true, notes: 'Cost-free grant · event-driven M&A · reduce into strength' },
+    { id: 'talabat', ticker: 'TALABAT', name: 'Talabat Holding', platform: 'DH/Talabat', type: 'STK', shares: 6250, price: 0.96, costPerShare: 1.60, currency: 'AED', addLevels: [], trimLevels: [], status: 'WATCH', isEmployerStock: true, notes: 'Employer stock · DFM listed · hold, working there · manual price' },
     // Binance
-    { id: 'shiba', ticker: 'SHIBA', name: 'Shiba Inu', platform: 'Binance', type: 'CRY', shares: 33630400.69, price: 0.00000596, costPerShare: 0.00000684, currency: 'USD', addLevels: [], trimLevels: [], status: 'WATCH', notes: 'Meme — hold or cut, no levels' },
-    { id: 'eth', ticker: 'ETH', name: 'Ethereum', platform: 'Binance', type: 'CRY', shares: 1.02972, price: 2258.90, costPerShare: 3431.18, currency: 'USD', addLevels: [], trimLevels: [{ price: 4000, action: 'break-even exit' }], status: 'WATCH', notes: 'Target break-even exit' },
-    { id: 'sol-binance', ticker: 'SOL', name: 'Solana (Binance)', platform: 'Binance', type: 'CRY', shares: 39.870013, price: 84.71, costPerShare: 170.08, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', notes: 'Target break-even exit' },
+    { id: 'shib', ticker: 'SHIB', name: 'Shiba Inu', platform: 'Binance', type: 'CRY', shares: 33631778.8241496213, price: 0.00000458, costPerShare: 0.0000072, currency: 'USD', addLevels: [], trimLevels: [], status: 'WATCH', notes: 'Meme — hold or cut, no levels' },
+    { id: 'eth', ticker: 'ETH', name: 'Ethereum', platform: 'Binance', type: 'CRY', shares: 1.031663937, price: 1658.07, costPerShare: 3586.88, currency: 'USD', addLevels: [], trimLevels: [{ price: 4000, action: 'break-even exit' }], status: 'WATCH', notes: 'Target break-even exit' },
+    { id: 'sol-binance', ticker: 'SOL', name: 'Solana (Binance)', platform: 'Binance', type: 'CRY', shares: 40.1310624738, price: 69.13, costPerShare: 159.46, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', notes: 'Target break-even exit' },
   ],
   closedPositions: [
     { id: 'smci-c', ticker: 'SMCI', platform: 'WIO', type: 'STK', closedDate: '14 May 26', qty: 10, sellPrice: '$32.08', costAED: 568, proceeds: 321, gainLoss: -247, pct: -43.5 },
-    { id: 'sofi-c', ticker: 'SOFI', platform: 'WIO', type: 'STK', closedDate: 'Jun 26', qty: 18, sellPrice: '$18.22', costAED: 514, proceeds: 328, gainLoss: -186, pct: -36.2 },
+    { id: 'sofi-c', ticker: 'SOFI', platform: 'WIO', type: 'STK', closedDate: 'Jun 26', qty: 18, sellPrice: '$17.21', costAED: 514, proceeds: 310, gainLoss: -204, pct: -39.7 },
+    { id: 'dher-c2', ticker: 'DHER', platform: 'Talabat/DH', type: 'STK', closedDate: 'Jun 26', qty: 685, sellPrice: '€36.88', costAED: 0, proceeds: 29602, gainLoss: 29602, pct: null },
     { id: 'ada-c', ticker: 'ADA', platform: 'Binance', type: 'CRY', closedDate: '03 Oct 24', qty: 2162, sellPrice: '$0.88', costAED: 2065, proceeds: 1903, gainLoss: -162, pct: -7.9 },
     { id: 'xrp2-c', ticker: 'XRP', platform: 'Binance', type: 'CRY', closedDate: '03 Oct 24', qty: 150.2, sellPrice: '$3.08', costAED: 520, proceeds: 463, gainLoss: -57, pct: -11.0 },
     { id: 'dher-c', ticker: 'DHER', platform: 'Talabat/DH', type: 'STK', closedDate: '23 Sep 24', qty: 537, sellPrice: '€27.77', costAED: 0, proceeds: 17310, gainLoss: 17310, pct: null },
@@ -78,7 +82,7 @@ const SEED = {
 };
 
 // ─── CoinGecko IDs ────────────────────────────────────────────────────────────
-const CG_IDS = { SOL: 'solana', ETH: 'ethereum', SHIBA: 'shiba-inu', BTC: 'bitcoin', AVAX: 'avalanche-2' };
+const CG_IDS = { SOL: 'solana', ETH: 'ethereum', SHIB: 'shiba-inu', SHIBA: 'shiba-inu', BTC: 'bitcoin', AVAX: 'avalanche-2' };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function TypeBadge({ type }) {
@@ -91,13 +95,14 @@ function StatusBadge({ status }) {
   return <span className={`inline-block text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${s[status] || s.HOLD}`}>{status}</span>;
 }
 
-function TriggerRail({ price, addLevels, trimLevels, status, currency }) {
+function TriggerRail({ price, addLevels, trimLevels, status, currency, type }) {
   const addLevel = addLevels?.[0]?.price;
   const trimLevel = trimLevels?.[0]?.price;
   const sym = currency === 'EUR' ? '€' : currency === 'AED' ? 'AED ' : '$';
   const fmtLvl = v => sym + (v >= 100 ? Math.round(v) : v.toFixed(2));
   const fmtNow = v => { const d = Math.abs(v) < 0.01 ? 6 : Math.abs(v) < 1 ? 4 : 2; return sym + v.toFixed(d); };
 
+  if (type === 'WLT') return <div className="text-[10px] text-teal-500">Manager-rebalanced · monitor value vs goal</div>;
   if (status === 'ACCUMULATE') return <div className="text-[10px] text-blue-400">▲ Accumulate on dips · $1k at −5%, $2k at −10%</div>;
   if (!addLevel && !trimLevel) return <div className="text-[10px] text-gray-600 italic">No trigger levels</div>;
 
@@ -506,7 +511,7 @@ export default function Investments() {
                       {pos.weight !== null ? pos.weight.toFixed(1) + '%' : <span className="text-[9px] text-gray-700">{(pos.isGrant || pos.isEmployerStock) ? 'excl.' : '—'}</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <TriggerRail price={pos.price} addLevels={pos.addLevels} trimLevels={pos.trimLevels} status={pos.status} currency={pos.currency} />
+                      <TriggerRail price={pos.price} addLevels={pos.addLevels} trimLevels={pos.trimLevels} status={pos.status} currency={pos.currency} type={pos.type} />
                       {pos.notes && <div className="text-[9px] text-gray-600 mt-1 italic">{pos.notes}</div>}
                     </td>
                     <td className="px-3 py-3"><StatusBadge status={pos.status} /></td>
