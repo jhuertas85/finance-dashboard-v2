@@ -48,8 +48,8 @@ const SEED = {
     { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 809.73, costPerShare: 809.73, currency: 'USD', addLevels: [], trimLevels: [], status: 'ACCUMULATE', notes: 'The base — add on dips, never trim' },
     { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.0754, price: 68.20, costPerShare: 161.00, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', notes: 'Speculative bucket · separate cash' },
     // DH / Talabat
-    { id: 'dher', ticker: 'DHER', name: 'Delivery Hero SE', platform: 'DH/Talabat', type: 'STK', shares: 1683, price: 36.89, costPerShare: 0, currency: 'EUR', addLevels: [], trimLevels: [{ price: 40, action: 'trim into deal strength' }], status: 'WATCH', notes: 'Cost-free grant · event-driven M&A · reduce into strength' },
-    { id: 'talabat', ticker: 'TALABAT', name: 'Talabat Holding', platform: 'DH/Talabat', type: 'STK', shares: 6250, price: 0.96, costPerShare: 0.4357, currency: 'AED', addLevels: [], trimLevels: [], status: 'WATCH', notes: 'DFM listed · manual price update' },
+    { id: 'dher', ticker: 'DHER', name: 'Delivery Hero SE', platform: 'DH/Talabat', type: 'STK', shares: 1683, price: 36.89, costPerShare: 0, currency: 'EUR', addLevels: [], trimLevels: [{ price: 40, action: 'trim into deal strength' }], status: 'WATCH', isGrant: true, notes: 'Cost-free grant · event-driven M&A · reduce into strength' },
+    { id: 'talabat', ticker: 'TALABAT', name: 'Talabat Holding', platform: 'DH/Talabat', type: 'STK', shares: 6250, price: 0.96, costPerShare: 0.4357, currency: 'AED', addLevels: [], trimLevels: [], status: 'WATCH', isEmployerStock: true, notes: 'Employer stock · DFM listed · hold, working there · manual price' },
     // Binance
     { id: 'shiba', ticker: 'SHIBA', name: 'Shiba Inu', platform: 'Binance', type: 'CRY', shares: 33630400.69, price: 0.00000596, costPerShare: 0.00000684, currency: 'USD', addLevels: [], trimLevels: [], status: 'WATCH', notes: 'Meme — hold or cut, no levels' },
     { id: 'eth', ticker: 'ETH', name: 'Ethereum', platform: 'Binance', type: 'CRY', shares: 1.02972, price: 2258.90, costPerShare: 3431.18, currency: 'USD', addLevels: [], trimLevels: [{ price: 4000, action: 'break-even exit' }], status: 'WATCH', notes: 'Target break-even exit' },
@@ -347,9 +347,13 @@ export default function Investments() {
       return { ...p, valueUSD, costUSD, pnlUSD, pnlPct };
     });
 
-    // Equity weight (exclude crypto for concentration)
-    const equityUSD = enriched.filter(p => p.type !== 'CRY').reduce((s, p) => s + p.valueUSD, 0);
-    enriched.forEach(p => { p.weight = equityUSD > 0 && p.type !== 'CRY' ? (p.valueUSD / equityUSD * 100) : null; });
+    // Equity weight (exclude crypto and employer/grant stocks — not actively managed positions)
+    const activeEquity = enriched.filter(p => p.type !== 'CRY' && !p.isGrant && !p.isEmployerStock);
+    const equityUSD = activeEquity.reduce((s, p) => s + p.valueUSD, 0);
+    enriched.forEach(p => {
+      const isActive = p.type !== 'CRY' && !p.isGrant && !p.isEmployerStock;
+      p.weight = isActive && equityUSD > 0 ? (p.valueUSD / equityUSD * 100) : null;
+    });
 
     const unrealizedPNL = totalValueUSD - totalCostUSD;
     const realizedPNL = (data.closedPositions || []).reduce((s, p) => s + (p.gainLoss || 0), 0);
@@ -367,7 +371,7 @@ export default function Investments() {
     const adds = [], trims = [], holds = [];
     enriched.forEach(p => {
       (p.addLevels || []).forEach(l => adds.push({ ticker: p.ticker, level: l.price, amount: l.amount, currency: p.currency, pctAway: ((p.price - l.price) / p.price * 100).toFixed(0) }));
-      (p.trimLevels || []).forEach(l => trims.push({ ticker: p.ticker, level: l.price, action: l.action, currency: p.currency, pctAway: ((l.price - p.price) / p.price * 100).toFixed(0) }));
+      (p.trimLevels || []).forEach(l => trims.push({ ticker: p.ticker, level: l.price, action: l.action, currency: p.currency, pctAway: ((l.price - p.price) / p.price * 100).toFixed(0), isGrant: !!p.isGrant }));
       if (p.status === 'HOLD' || p.status === 'ACCUMULATE' || p.status === 'WATCH') holds.push(p);
     });
     // Sort adds by priority order
@@ -476,7 +480,12 @@ export default function Investments() {
                       <div className="flex items-center gap-2">
                         <TypeBadge type={pos.type} />
                         <div>
-                          <div className="font-bold text-white text-sm leading-none">{pos.ticker}</div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-white text-sm leading-none">{pos.ticker}</span>
+                            {(pos.isGrant || pos.isEmployerStock) && (
+                              <span className="text-[9px] bg-amber-900/50 text-amber-400 px-1 rounded font-mono">{pos.isGrant ? 'grant' : 'employer'}</span>
+                            )}
+                          </div>
                           <div className="text-[10px] text-gray-500 mt-0.5 max-w-[120px] truncate">{pos.name}</div>
                         </div>
                       </div>
@@ -493,8 +502,8 @@ export default function Investments() {
                       <div>{pos.pnlUSD >= 0 ? '+' : ''}{fmtUSD(pos.pnlUSD)}</div>
                       {pos.pnlPct !== null && <div className="text-[10px]">{pos.pnlPct >= 0 ? '+' : ''}{pos.pnlPct.toFixed(1)}%</div>}
                     </td>
-                    <td className="px-3 py-3 text-right font-mono text-gray-500 hidden sm:table-cell text-[11px]">
-                      {pos.weight !== null ? pos.weight.toFixed(1) + '%' : '—'}
+                    <td className="px-3 py-3 text-right font-mono text-gray-500 hidden sm:table-cell text-[11px]" title={(pos.isGrant || pos.isEmployerStock) ? 'Excluded from concentration (grant/employer stock)' : undefined}>
+                      {pos.weight !== null ? pos.weight.toFixed(1) + '%' : <span className="text-[9px] text-gray-700">{(pos.isGrant || pos.isEmployerStock) ? 'excl.' : '—'}</span>}
                     </td>
                     <td className="px-4 py-3">
                       <TriggerRail price={pos.price} addLevels={pos.addLevels} trimLevels={pos.trimLevels} status={pos.status} currency={pos.currency} />
@@ -551,7 +560,10 @@ export default function Investments() {
               const sym = t.currency === 'EUR' ? '€' : t.currency === 'AED' ? 'AED ' : '$';
               return (
                 <div key={i} className="flex justify-between py-2 border-b border-neutral-900 last:border-0">
-                  <span className="font-bold text-white text-xs">{t.ticker}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-white text-xs">{t.ticker}</span>
+                    {t.isGrant && <span className="text-[9px] bg-amber-900/50 text-amber-400 px-1 rounded font-mono">grant</span>}
+                  </div>
                   <span className="font-mono text-xs">
                     <span className="text-emerald-300">{sym}{t.level}</span>
                     {t.action && <span className="text-gray-500 ml-2 text-[10px]">{t.action}</span>}
@@ -570,7 +582,8 @@ export default function Investments() {
             <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">AMD</span><span className="text-[10px] text-gray-500 ml-2">never sell for concentration</span></div>
             <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">CSPX</span><span className="text-[10px] text-gray-500 ml-2">base · only add on −5/−10%</span></div>
             <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">CAKE</span><span className="text-[10px] text-gray-500 ml-2">no adds · trim at $90</span></div>
-            <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">DHER</span><span className="text-[10px] text-gray-500 ml-2">event-driven · reduce into €40+ deal strength</span></div>
+            <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">DHER</span><span className="text-[9px] bg-amber-900/50 text-amber-400 px-1 rounded font-mono ml-1">grant</span><span className="text-[10px] text-gray-500 ml-2">work shares · sell into €40+ strength · pure upside</span></div>
+            <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">TALABAT</span><span className="text-[9px] bg-amber-900/50 text-amber-400 px-1 rounded font-mono ml-1">employer</span><span className="text-[10px] text-gray-500 ml-2">work there · hold · not counted in concentration</span></div>
             <div className="py-2 border-b border-neutral-900"><span className="font-bold text-amber-400 text-xs">Crypto</span><span className="text-[10px] text-gray-500 ml-2">DCA only at deep levels · target break-even</span></div>
             <div className="py-2"><span className="text-amber-400 text-xs font-mono">Today</span><span className="text-[10px] text-gray-500 ml-2">no triggers active — hold</span></div>
           </div>
