@@ -26,13 +26,17 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
   const hasLinkedTxs = pendingTxs.length > 0;
 
   // Any gap between outstanding balance and sum of tracked charges
-  // (e.g. reconciliation adjustments, transactions without reconciled flag)
+  // Positive gap = untracked charges (e.g. cash purchases not logged)
+  // Negative gap = reconciliation credits reduce the balance below tracked expenses
   const trackedTotal = pendingTxs.reduce((sum, tx) => sum + toAED(tx.amount, tx.currency), 0);
   const untrackedAED = outstandingAED - trackedTotal;
   const hasUntracked = untrackedAED > 0.01;
+  const hasCreditGap = untrackedAED < -0.01;      // tracked expenses > outstanding → credits exist
+  const creditGapAED = hasCreditGap ? Math.abs(untrackedAED) : 0;
 
   const [selected, setSelected] = useState(new Set(pendingTxs.map(t => t.id)));
   const [includeUntracked, setIncludeUntracked] = useState(true);
+  const [includeCreditGap, setIncludeCreditGap] = useState(true);
   const [payFromId, setPayFromId] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -45,12 +49,16 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
   const selectedTxs = pendingTxs.filter(t => selected.has(t.id));
   const selectedTotal = selectedTxs.reduce((sum, tx) => sum + toAED(tx.amount, tx.currency), 0);
 
-  const payAmountAED = (hasLinkedTxs || hasUntracked)
-    ? selectedTotal + (hasUntracked && includeUntracked ? untrackedAED : 0)
+  const payAmountAED = (hasLinkedTxs || hasUntracked || hasCreditGap)
+    ? selectedTotal
+      + (hasUntracked && includeUntracked ? untrackedAED : 0)
+      - (hasCreditGap && includeCreditGap ? creditGapAED : 0)
     : outstandingAED;
 
   const allTxsSelected = selected.size === pendingTxs.length;
-  const allSelected = allTxsSelected && (!hasUntracked || includeUntracked);
+  const allSelected = allTxsSelected
+    && (!hasUntracked || includeUntracked)
+    && (!hasCreditGap || includeCreditGap);
 
   function toggleTx(id) {
     setSelected(prev => {
@@ -64,9 +72,11 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
     if (allSelected) {
       setSelected(new Set());
       setIncludeUntracked(false);
+      setIncludeCreditGap(false);
     } else {
       setSelected(new Set(pendingTxs.map(t => t.id)));
       if (hasUntracked) setIncludeUntracked(true);
+      if (hasCreditGap) setIncludeCreditGap(true);
     }
   }
 
@@ -119,7 +129,7 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
 
   const canPay = payFromId && payAmountAED > 0 && (selectedTxs.length > 0 || (!hasLinkedTxs) || (hasUntracked && includeUntracked));
 
-  const totalItemCount = pendingTxs.length + (hasUntracked ? 1 : 0);
+  const totalItemCount = pendingTxs.length + (hasUntracked ? 1 : 0) + (hasCreditGap ? 1 : 0);
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -194,7 +204,7 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
                     </label>
                   ))}
 
-                  {/* Untracked / reconciliation gap row */}
+                  {/* Untracked charges gap row */}
                   {hasUntracked && (
                     <label className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition ${
                       includeUntracked ? 'bg-amber-900/20 border-amber-800' : 'bg-neutral-800 border-neutral-700'
@@ -211,6 +221,27 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
                       </div>
                       <span className="text-amber-400 text-sm font-mono shrink-0">
                         {fmt2(untrackedAED, 'AED')}
+                      </span>
+                    </label>
+                  )}
+
+                  {/* Reconciliation credits row — positive adjustments that REDUCE what's owed */}
+                  {hasCreditGap && (
+                    <label className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition ${
+                      includeCreditGap ? 'bg-emerald-900/20 border-emerald-800' : 'bg-neutral-800 border-neutral-700'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={includeCreditGap}
+                        onChange={() => setIncludeCreditGap(v => !v)}
+                        className="accent-emerald-500 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-emerald-300 text-sm">Reconciliation credits</p>
+                        <p className="text-gray-500 text-xs">Positive adjustments that reduce your balance</p>
+                      </div>
+                      <span className="text-emerald-400 text-sm font-mono shrink-0">
+                        −{fmt2(creditGapAED, 'AED')}
                       </span>
                     </label>
                   )}
