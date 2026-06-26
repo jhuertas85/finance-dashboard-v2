@@ -16,7 +16,12 @@ export function AccountBadge({ name, size = 'md' }) {
   );
 }
 
-export default function AccountSelect({ value, onChange, accounts, placeholder = '— Select —', className = '', compact = false }) {
+function fmtBal(a) {
+  if (a.currentBalance === undefined || a.currentBalance === null) return '';
+  return `${a.currency || ''} ${Number(a.currentBalance).toLocaleString(undefined, { maximumFractionDigits: 0 })}`.trim();
+}
+
+export default function AccountSelect({ value, onChange, accounts, placeholder = '— Select —', className = '', compact = false, showBalance = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef();
   const selected = accounts.find(a => a.id === value);
@@ -42,6 +47,7 @@ export default function AccountSelect({ value, onChange, accounts, placeholder =
           <>
             <AccountBadge name={selected.name} size={compact ? 'sm' : 'md'} />
             <span className={compact ? 'text-gray-300' : 'flex-1 truncate text-white'}>{selected.name}</span>
+            {showBalance && <span className="text-gray-500 text-[10px] font-mono ml-auto shrink-0">{fmtBal(selected)}</span>}
           </>
         ) : (
           <span className={compact ? 'text-gray-400' : 'flex-1 text-gray-500'}>{placeholder}</span>
@@ -62,7 +68,8 @@ export default function AccountSelect({ value, onChange, accounts, placeholder =
               className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2.5 hover:bg-neutral-700 transition whitespace-nowrap ${a.id === value ? 'bg-neutral-700/60' : ''}`}>
               <AccountBadge name={a.name} size="sm" />
               <span className="text-white">{a.name}</span>
-              {a.id === value && <span className="ml-auto pl-4 text-emerald-400 text-xs">✓</span>}
+              {showBalance && <span className="text-gray-500 text-[10px] font-mono ml-auto shrink-0 pl-3">{fmtBal(a)}</span>}
+              {a.id === value && <span className={`${showBalance ? '' : 'ml-auto'} pl-2 text-emerald-400 text-xs shrink-0`}>✓</span>}
             </button>
           ))}
         </div>

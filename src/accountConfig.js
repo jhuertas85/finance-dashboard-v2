@@ -25,6 +25,15 @@ export function sortAndFilterAccounts(accounts) {
   return result;
 }
 
+// Like sortAndFilterAccounts but includes ALL accounts (priority ones first, rest alphabetical)
+export function sortAllAccounts(accounts) {
+  const ordered = sortAndFilterAccounts(accounts);
+  const remaining = accounts
+    .filter(a => !ordered.find(o => o.id === a.id))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return [...ordered, ...remaining];
+}
+
 const BRAND_MAP = [
   { match: ['nbd'],   color: '#C8102E', initials: 'NBD', emoji: '🔴' },
   { match: ['mash'],  color: '#F04E23', initials: 'MQ',  emoji: '🟠' },

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from './firebase-config.js';
+import AccountSelect from './AccountSelect.jsx';
+import { sortAllAccounts } from './accountConfig.js';
 
 const FX = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
 
@@ -9,6 +11,8 @@ function toNative(aedAmount, currency) {
 }
 
 export default function ReconcileModal({ accounts, onClose }) {
+  const sortedAccounts = sortAllAccounts(accounts);
+
   const [selectedId, setSelectedId] = useState('');
   const [realBalance, setRealBalance] = useState('');
   const [currency, setCurrency] = useState('AED');
@@ -23,6 +27,14 @@ export default function ReconcileModal({ accounts, onClose }) {
   const currentInCurrency = account
     ? (account.currentBalance * (FX[currency] || 1)) / (FX[account.currency] || 1)
     : 0;
+
+  function handleAccountSelect(id) {
+    setSelectedId(id);
+    setDiff(null);
+    setRealBalance('');
+    const a = accounts.find(x => x.id === id);
+    if (a) setCurrency(a.currency);
+  }
 
   function checkDiff() {
     if (!account) return;
@@ -83,22 +95,13 @@ export default function ReconcileModal({ accounts, onClose }) {
               {/* Account selector */}
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Account</label>
-                <select
+                <AccountSelect
                   value={selectedId}
-                  onChange={e => {
-                    setSelectedId(e.target.value);
-                    setDiff(null);
-                    setRealBalance('');
-                    const a = accounts.find(x => x.id === e.target.value);
-                    if (a) setCurrency(a.currency);
-                  }}
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm"
-                >
-                  <option value="">— Select —</option>
-                  {accounts.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} ({a.currency} {Number(a.currentBalance).toLocaleString(undefined, { maximumFractionDigits: 2 })})</option>
-                  ))}
-                </select>
+                  onChange={handleAccountSelect}
+                  accounts={sortedAccounts}
+                  placeholder="— Select —"
+                  showBalance
+                />
               </div>
 
               {/* Current recorded balance */}
