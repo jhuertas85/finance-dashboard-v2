@@ -45,7 +45,7 @@ function spendBarColor(pct) {
   return '#10b981';
 }
 
-export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED', onReviewBills, onNavigateToTx }) {
+export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED', fxRates = {}, onReviewBills, onNavigateToTx }) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
@@ -88,15 +88,18 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     : viewYear >= now.getFullYear();
 
   // ─── Currency display helpers ────────────────────────────────────────────────
-  const FX_DISPLAY = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
-  const displayRate = FX_DISPLAY[selectedCurrency] || 1;
+  const isOwnMode = selectedCurrency === 'OWN';
+  // OWN mode: totals in AED, per-account lines in native currency
+  const displayCurrency = isOwnMode ? 'AED' : selectedCurrency;
+  const FX_DISPLAY = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95, ...fxRates };
+  const displayRate = FX_DISPLAY[displayCurrency] || 1;
   const fmt = (aed) => {
     if (aed == null || isNaN(aed)) return '—';
-    return `${selectedCurrency} ${Math.round(aed / displayRate).toLocaleString()}`;
+    return `${displayCurrency} ${Math.round(aed / displayRate).toLocaleString()}`;
   };
   const fmtFull = (aed) => {
     if (aed == null || isNaN(aed)) return '—';
-    return `${selectedCurrency} ${(aed / displayRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${displayCurrency} ${(aed / displayRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
   const fmtS = (aed) => {
     if (aed == null || isNaN(aed)) return '—';
@@ -106,7 +109,12 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     if (abs >= 1e3) return (v < 0 ? '-' : '') + (abs / 1e3).toFixed(1) + 'K';
     return (v < 0 ? '-' : '') + Math.round(abs);
   };
-  const fmtAccFull = (balance, currency) => fmtFull(toAED(balance, currency));
+  const fmtAccFull = (balance, currency) => {
+    if (isOwnMode) {
+      return `${currency || 'AED'} ${Number(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    return fmtFull(toAED(balance, currency));
+  };
 
   // ─── Net worth & account groups ─────────────────────────────────────────────
   const netWorth = calculateNetWorth(accounts);

@@ -7,7 +7,9 @@ import Investments from './Investments.jsx';
 import AddTransactionModal from './AddTransactionModal.jsx';
 import ReconcileModal from './ReconcileModal.jsx';
 
-const CURRENCIES = ['AED', 'USD', 'EUR', 'PEN'];
+const CURRENCIES = ['AED', 'USD', 'EUR', 'PEN', 'OWN'];
+const CURRENCY_LABELS = { OWN: 'Own' };
+const DEFAULT_FX = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'transactions', label: 'Transactions', icon: '📋' },
@@ -20,7 +22,10 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState([]);
   const [recurringBills, setRecurringBills] = useState([]);
-  const [selectedCurrency, setSelectedCurrency] = useState('AED');
+  const [selectedCurrency, setSelectedCurrency] = useState('OWN');
+  const [fxRates, setFxRates] = useState(DEFAULT_FX);
+  const [fxLastUpdated, setFxLastUpdated] = useState(null);
+  const [fxLoading, setFxLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddTx, setShowAddTx] = useState(false);
@@ -79,6 +84,29 @@ export default function App() {
     return () => { unsubAccounts(); unsubTx(); unsubBudgets(); unsubBills(); };
   }
 
+  async function fetchFxRates() {
+    if (fxLoading) return;
+    setFxLoading(true);
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/AED');
+      if (!res.ok) throw new Error('fetch failed');
+      const data = await res.json();
+      if (data.result === 'success' && data.rates) {
+        const r = data.rates;
+        setFxRates({
+          AED: 1,
+          USD: r.USD ? 1 / r.USD : DEFAULT_FX.USD,
+          EUR: r.EUR ? 1 / r.EUR : DEFAULT_FX.EUR,
+          PEN: r.PEN ? 1 / r.PEN : DEFAULT_FX.PEN,
+        });
+        setFxLastUpdated(new Date());
+      }
+    } catch {
+      // keep current rates on failure
+    }
+    setFxLoading(false);
+  }
+
   function handleRefresh() {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1200);
@@ -127,19 +155,36 @@ export default function App() {
               {monthLabel} · Day {day}/{daysInMonth} · {timeLabel}
             </span>
 
-            {/* Currency pills */}
-            <div className={`flex items-center gap-1 rounded-xl p-1 ${darkMode ? 'bg-neutral-900' : 'bg-gray-200'}`}>
-              {CURRENCIES.map(cur => (
-                <button
-                  key={cur}
-                  onClick={() => setSelectedCurrency(cur)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    selectedCurrency === cur
-                      ? 'bg-emerald-500 text-white shadow'
-                      : darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >{cur}</button>
-              ))}
+            {/* Currency pills + FX refresh */}
+            <div className="flex items-center gap-1.5">
+              <div className={`flex items-center gap-1 rounded-xl p-1 ${darkMode ? 'bg-neutral-900' : 'bg-gray-200'}`}>
+                {CURRENCIES.map(cur => (
+                  <button
+                    key={cur}
+                    onClick={() => setSelectedCurrency(cur)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      selectedCurrency === cur
+                        ? 'bg-emerald-500 text-white shadow'
+                        : darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >{CURRENCY_LABELS[cur] || cur}</button>
+                ))}
+              </div>
+              <button
+                onClick={fetchFxRates}
+                disabled={fxLoading}
+                title={fxLastUpdated
+                  ? `FX rates live · updated ${fxLastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                  : 'Rates: hardcoded — click to fetch live'}
+                className={`text-sm px-1.5 py-1 rounded-lg transition ${
+                  fxLoading ? 'text-emerald-400 animate-spin' : darkMode ? 'text-gray-600 hover:text-emerald-400' : 'text-gray-400 hover:text-emerald-600'
+                }`}
+              >↻</button>
+              {fxLastUpdated && (
+                <span className="text-[10px] text-gray-600 hidden sm:block">
+                  {fxLastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
 
             {/* Action buttons */}
@@ -195,6 +240,7 @@ export default function App() {
             budgets={budgets}
             recurringBills={recurringBills}
             selectedCurrency={selectedCurrency}
+            fxRates={fxRates}
             darkMode={darkMode}
             onReviewBills={() => { setAddTxInitialTab('recurring'); setShowAddTx(true); }}
             onNavigateToTx={navigateToTx}

@@ -501,6 +501,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                 onChange={setFromAccount}
                 accounts={txAccounts}
                 placeholder="— Select —"
+                showBalance
               />
             </div>
             {type === 'transfer' && (
@@ -511,6 +512,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                   onChange={setToAccount}
                   accounts={txAccounts.filter(a => a.id !== fromAccount)}
                   placeholder="— Select —"
+                  showBalance
                 />
               </div>
             )}
@@ -611,6 +613,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                 accounts={txAccounts}
                 placeholder="— Select account —"
                 className="border-emerald-600"
+                showBalance
               />
             </div>
 

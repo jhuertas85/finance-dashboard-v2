@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { doc, collection, writeBatch } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import { toAED } from './utils.js';
+import AccountSelect from './AccountSelect.jsx';
+import { sortAllAccounts } from './accountConfig.js';
 
 const FX = { AED: 1, USD: 3.67, EUR: 4.0, PEN: 0.95 };
 
@@ -260,18 +262,13 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
 
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 mb-1 block">Pay from account</label>
-                <select
+                <AccountSelect
                   value={payFromId}
-                  onChange={e => setPayFromId(e.target.value)}
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm"
-                >
-                  <option value="">— Select account —</option>
-                  {payableAccounts.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.currency} {Number(a.currentBalance).toLocaleString(undefined, { maximumFractionDigits: 0 })})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setPayFromId}
+                  accounts={sortAllAccounts(payableAccounts)}
+                  showBalance
+                  placeholder="— Select account —"
+                />
               </div>
 
               {error && <p className="text-red-400 text-xs">{error}</p>}
