@@ -88,6 +88,7 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
     setError('');
     try {
       const payFromAccount = accounts.find(a => a.id === payFromId);
+      if (!payFromAccount) throw new Error('Source account not found — please re-select and try again.');
       const batch = writeBatch(db);
 
       // Mark selected transactions as reconciled (paid off)
@@ -129,7 +130,7 @@ export default function PayCreditModal({ creditCard, accounts, transactions, onC
     setSaving(false);
   }
 
-  const canPay = payFromId && payAmountAED > 0 && (selectedTxs.length > 0 || (!hasLinkedTxs) || (hasUntracked && includeUntracked));
+  const canPay = payFromId && payAmountAED > 0 && (selectedTxs.length > 0 || (!hasLinkedTxs) || (hasUntracked && includeUntracked) || (hasCreditGap && includeCreditGap));
 
   const totalItemCount = pendingTxs.length + (hasUntracked ? 1 : 0) + (hasCreditGap ? 1 : 0);
 
