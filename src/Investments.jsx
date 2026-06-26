@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 
 // ─── FX & helpers ─────────────────────────────────────────────────────────────
@@ -238,8 +238,15 @@ function EditPositionModal({ pos, onSave, onClose, onDelete }) {
   );
 }
 
+// ─── Platform → account matcher ───────────────────────────────────────────────
+const PLATFORM_ACCOUNT_RULES = [
+  { platform: 'WIO',         match: n => n.includes('wio') && n.includes('invest') },
+  { platform: 'DH/Talabat', match: n => n.includes('talabat') && n.includes('equity') },
+  { platform: 'Binance',     match: n => n.includes('binance') },
+];
+
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function Investments() {
+export default function Investments({ accounts = [] }) {
   const [data, setData] = useState(SEED);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -249,6 +256,30 @@ export default function Investments() {
   const [showClosed, setShowClosed] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // ── Sync investment platform totals → usable account balances ──
+  const initialSyncDone = useRef(false);
+
+  async function syncToAccounts(positions) {
+    if (!accounts.length || !positions.length) return;
+    // Compute total USD value per platform
+    const totals = {};
+    positions.forEach(p => {
+      const valueUSD = toUSD(p.price * p.shares, p.currency);
+      totals[p.platform] = (totals[p.platform] || 0) + valueUSD;
+    });
+    // Write to matching Firestore accounts
+    for (const { platform, match } of PLATFORM_ACCOUNT_RULES) {
+      if (totals[platform] === undefined) continue;
+      const account = accounts.find(a => match((a.name || '').toLowerCase()));
+      if (!account) continue;
+      try {
+        await updateDoc(doc(db, 'accounts', account.id), {
+          currentBalance: Math.round(totals[platform] * 100) / 100,
+        });
+      } catch (e) { console.error('Investment balance sync failed:', platform, e); }
+    }
+  }
+
   // ── Load from Firestore ──
   useEffect(() => {
     const ref = doc(db, 'investments', 'main');
@@ -257,6 +288,14 @@ export default function Investments() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  // ── Initial sync once both investment data and accounts are ready ──
+  useEffect(() => {
+    if (!loading && accounts.length > 0 && !initialSyncDone.current) {
+      initialSyncDone.current = true;
+      syncToAccounts(data.positions || []);
+    }
+  }, [loading, accounts.length]);
 
   async function persist(newData) {
     setSaving(true);
@@ -319,6 +358,7 @@ export default function Investments() {
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const newData = { ...data, positions: updated, config: { ...data.config, lastUpdated: new Date().toISOString() } };
     await persist(newData);
+    await syncToAccounts(updated);
     setPriceMsg(fail > 0 ? `Crypto updated · Stocks need manual update (CORS) · ${now}` : `Prices updated · ${ok} tickers · ${now}`);
     setRefreshing(false);
   }
@@ -327,13 +367,14 @@ export default function Investments() {
     const positions = editingPos
       ? data.positions.map(p => p.id === pos.id ? pos : p)
       : [...data.positions, pos];
-    persist({ ...data, positions });
+    persist({ ...data, positions }).then(() => syncToAccounts(positions));
     setEditingPos(null);
     setAddingPos(false);
   }
 
   function deletePosition(id) {
-    persist({ ...data, positions: data.positions.filter(p => p.id !== id) });
+    const positions = data.positions.filter(p => p.id !== id);
+    persist({ ...data, positions }).then(() => syncToAccounts(positions));
     setEditingPos(null);
   }
 

@@ -256,7 +256,7 @@ export default function App() {
             onClearExternalFilter={() => setTxFilter(null)}
           />
         )}
-        {activeTab === 'investments' && <Investments />}
+        {activeTab === 'investments' && <Investments accounts={accounts} />}
       </main>
 
       {showAddTx && (
