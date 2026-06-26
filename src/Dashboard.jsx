@@ -356,8 +356,31 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       capByKey[key] = Math.round(cap);
     }
 
+    // Reconstruct historical usable from transfer flows into/out of usable accounts.
+    // Note: captures cash movements only — price appreciation is not tracked historically.
+    const usableIds = new Set(
+      accounts.filter(a => a.netWorthBucket === 'usable').map(a => a.id)
+    );
+    const usableFlows = {};
+    transactions.forEach(tx => {
+      if (tx.type !== 'transfer') return;
+      const d = new Date(tx.date);
+      const key = makeKey(d.getFullYear(), d.getMonth() + 1);
+      const amt = toAED(tx.amount, tx.currency);
+      if (usableIds.has(tx.toAccount)) usableFlows[key] = (usableFlows[key] || 0) + amt;
+      if (usableIds.has(tx.fromAccount)) usableFlows[key] = (usableFlows[key] || 0) - amt;
+    });
+    const usableByKey = {};
+    let us = usableTotal;
+    for (let i = histMonths.length - 1; i >= 0; i--) {
+      usableByKey[histMonths[i]] = Math.round(us);
+      if (i > 0) us -= (usableFlows[histMonths[i]] || 0);
+    }
+    for (const key of months.filter(k => k > nowKey).sort()) {
+      usableByKey[key] = Math.round(usableTotal);
+    }
+
     const futNet = futureAssetsTotal - futureLiabilitiesTotal;
-    const u = Math.round(usableTotal);
     const f = Math.round(futNet);
 
     return months.map(key => {
@@ -366,6 +389,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       const isHist = !isFuture;
       const isProj = isFuture || isCurrent;
       const c = capByKey[key] ?? Math.round(capitalTotal);
+      const u = usableByKey[key] ?? Math.round(usableTotal);
       const nw = c + u + f;
       const label = new Date(key + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
       return {
@@ -383,7 +407,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         NWProj: (isFuture || isCurrent) ? nw : undefined,
       };
     });
-  }, [transactions, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange]);
+  }, [transactions, accounts, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange]);
 
   // ─── Recurring bills alerts ──────────────────────────────────────────────────
   // Bills paid this month: match by description (handles both manual entry and imports)
@@ -867,12 +891,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                 const d = payload[0]?.payload;
                 if (!d) return null;
                 const sfx = d.isFuture ? ' (est.)' : '';
+                const isHist = !d.isFuture && !d.isCurrent;
                 return (
                   <div style={{ background: '#111', border: '1px solid #333', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
                     <p style={{ color: '#9ca3af', fontWeight: 600, marginBottom: 6 }}>{label}</p>
                     <p style={{ color: '#06b6d4', marginBottom: 2 }}>Net Worth: {fmtS(d.nwVal)}{sfx}</p>
-                    <p style={{ color: '#f59e0b', marginBottom: 2 }}>Future: {fmtS(d.futVal)}{sfx}</p>
-                    <p style={{ color: '#10b981', marginBottom: 2 }}>Usable: {fmtS(d.usableVal)}{sfx}</p>
+                    <p style={{ color: '#f59e0b', marginBottom: 2 }}>Future: {fmtS(d.futVal)}{isHist ? ' ·' : sfx}{isHist && <span style={{ color: '#6b7280', fontSize: 10 }}> today's value</span>}</p>
+                    <p style={{ color: '#10b981', marginBottom: 2 }}>Usable: {fmtS(d.usableVal)}{isHist ? ' ·' : sfx}{isHist && <span style={{ color: '#6b7280', fontSize: 10 }}> cash flows only</span>}</p>
                     <p style={{ color: '#8b5cf6' }}>Capital: {fmtS(d.capVal)}{sfx}</p>
                   </div>
                 );
