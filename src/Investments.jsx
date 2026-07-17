@@ -255,6 +255,9 @@ export default function Investments({ accounts = [] }) {
   const [addingPos, setAddingPos] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('twelvedata_key') || '');
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [keyDraft, setKeyDraft] = useState('');
 
   // ── Sync investment platform totals → usable account balances ──
   const initialSyncDone = useRef(false);
@@ -329,47 +332,43 @@ export default function Investments({ accounts = [] }) {
       } catch { fail++; }
     }
 
-    // 2. Stocks via Yahoo Finance chart endpoint (per-symbol, parallel)
-    const yahooMap = {
+    // 2. Stocks via Twelve Data (free key at twelvedata.com — 800 calls/day)
+    const twelveMap = {
       AMD: 'AMD', NVDA: 'NVDA', AVGO: 'AVGO', META: 'META',
-      AMZN: 'AMZN', NOW: 'NOW', CAKE: 'CAKE', CSPX: 'CSPX.L',
-      DHER: 'DHER.DE', SOFI: 'SOFI',
+      AMZN: 'AMZN', NOW: 'NOW', CAKE: 'CAKE',
+      CSPX: 'CSPX:LSE', DHER: 'DHER:XETR',
     };
-    const stockPositions = updated.filter(p => p.type === 'STK' || p.type === 'ETF');
-    const seenTickers = new Set();
-    const uniqueStocks = stockPositions.filter(p => {
-      if (seenTickers.has(p.ticker) || !yahooMap[p.ticker]) return false;
-      seenTickers.add(p.ticker);
-      return true;
-    });
-
-    const fetchResults = await Promise.allSettled(
-      uniqueStocks.map(async p => {
-        const yt = yahooMap[p.ticker];
+    if (apiKey) {
+      const stockPositions = updated.filter(p => p.type === 'STK' || p.type === 'ETF');
+      const syms = [...new Set(stockPositions.map(p => twelveMap[p.ticker]).filter(Boolean))];
+      try {
         const r = await fetch(
-          `https://query2.finance.yahoo.com/v8/finance/chart/${yt}?interval=1d&range=1d`
+          `https://api.twelvedata.com/price?symbol=${syms.join(',')}&apikey=${apiKey}`
         );
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
-        const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-        if (!price || price <= 0) throw new Error('no price');
-        return { ticker: p.ticker, price };
-      })
-    );
-
-    fetchResults.forEach(res => {
-      if (res.status !== 'fulfilled') { fail++; return; }
-      const { ticker, price } = res.value;
-      updated.forEach((p, i) => {
-        if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
-      });
-    });
+        const resp = await r.json();
+        // Single symbol → { price: "X" }, multiple → { AMD: { price: "X" }, ... }
+        const bySymbol = syms.length === 1 ? { [syms[0]]: resp } : resp;
+        Object.entries(twelveMap).forEach(([ticker, sym]) => {
+          const price = parseFloat(bySymbol[sym]?.price);
+          if (!price || price <= 0 || isNaN(price)) return;
+          updated.forEach((p, i) => {
+            if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
+          });
+        });
+      } catch { fail++; }
+    }
 
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const newData = { ...data, positions: updated, config: { ...data.config, lastUpdated: new Date().toISOString() } };
     await persist(newData);
     await syncToAccounts(updated);
-    setPriceMsg(fail > 0 ? `Partial update · ${ok} tickers · some sources failed · ${now}` : `All prices updated · ${ok} tickers · ${now}`);
+    if (!apiKey) {
+      setPriceMsg(`Crypto updated · stocks need API key · click "API Key" to add · ${now}`);
+    } else if (fail > 0) {
+      setPriceMsg(`Partial update · ${ok} tickers · some failed · ${now}`);
+    } else {
+      setPriceMsg(`All prices updated · ${ok} tickers · ${now}`);
+    }
     setRefreshing(false);
   }
 
@@ -455,9 +454,42 @@ export default function Investments({ accounts = [] }) {
           <h2 className="text-lg font-bold text-white tracking-tight">Investment Command</h2>
           {lastUpdated && <p className="text-xs text-gray-600 mt-0.5">Prices as of {lastUpdated}</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {saving && <span className="text-xs text-gray-500">Saving…</span>}
           {priceMsg && <span className="text-xs text-gray-500 max-w-xs text-right">{priceMsg}</span>}
+
+          {/* API key input */}
+          {showKeyInput ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={keyDraft}
+                onChange={e => setKeyDraft(e.target.value)}
+                placeholder="Paste Twelve Data key…"
+                className="bg-neutral-800 border border-neutral-600 rounded-lg px-2.5 py-1.5 text-white text-xs w-56 outline-none focus:border-emerald-500"
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  const k = keyDraft.trim();
+                  if (k) { localStorage.setItem('twelvedata_key', k); setApiKey(k); }
+                  setShowKeyInput(false); setKeyDraft('');
+                }}
+                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition">
+                Save
+              </button>
+              <button onClick={() => { setShowKeyInput(false); setKeyDraft(''); }}
+                className="px-2 py-1.5 text-gray-500 hover:text-white text-xs transition">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setKeyDraft(apiKey); setShowKeyInput(true); }}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border transition ${apiKey ? 'bg-neutral-800 border-neutral-700 text-gray-400 hover:border-neutral-500' : 'bg-amber-900/30 border-amber-700 text-amber-400 hover:border-amber-500'}`}
+              title={apiKey ? 'Twelve Data key set — click to change' : 'Add Twelve Data API key for live stock prices'}>
+              {apiKey ? '🔑 API Key' : '⚠ API Key'}
+            </button>
+          )}
+
           <button onClick={() => setAddingPos(true)}
             className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-gray-300 rounded-xl text-xs font-semibold hover:border-neutral-500 transition">
             + Add Position
