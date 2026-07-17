@@ -147,7 +147,7 @@ function TriggerRail({ price, addLevels, trimLevels, status, currency, type }) {
   const dTrim = trimLevel ? ((trimLevel - price) / price * 100).toFixed(0) : null;
 
   return (
-    <div className="w-full min-w-[160px]">
+    <div className="w-full">
       <div className="relative h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg,rgba(96,165,250,.5) 0%,rgba(96,165,250,.1) 20%,#1f2937 40%,#1f2937 60%,rgba(52,211,153,.1) 80%,rgba(52,211,153,.5) 100%)', border: '1px solid #374151' }}>
         <div className="absolute w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-black" style={{ left: `${pct}%`, top: '50%', transform: 'translate(-50%,-50%)', boxShadow: '0 0 6px rgba(245,177,76,.8)' }} />
       </div>
@@ -594,7 +594,7 @@ export default function Investments({ accounts = [] }) {
                   <th className="text-right px-3 py-2">Value</th>
                   <th className="text-right px-3 py-2">P&amp;L</th>
                   <th className="text-right px-3 py-2 hidden sm:table-cell">Wt</th>
-                  <th className="px-4 py-2 min-w-[200px]">ADD ◂— now —▸ TRIM</th>
+                  <th className="px-4 py-2 w-[220px]">ADD ◂— now —▸ TRIM</th>
                   <th className="px-3 py-2">Status</th>
                   <th className="px-2 py-2 w-6"></th>
                 </tr>
@@ -640,9 +640,11 @@ export default function Investments({ accounts = [] }) {
                     <td className="px-3 py-3 text-right font-mono text-gray-500 hidden sm:table-cell text-[11px]" title={(pos.isGrant || pos.isEmployerStock) ? 'Excluded from concentration (grant/employer stock)' : undefined}>
                       {pos.weight !== null ? pos.weight.toFixed(1) + '%' : <span className="text-[9px] text-gray-700">{(pos.isGrant || pos.isEmployerStock) ? 'excl.' : '—'}</span>}
                     </td>
-                    <td className="px-4 py-3">
-                      <TriggerRail price={pos.price} addLevels={pos.addLevels} trimLevels={pos.trimLevels} status={pos.status} currency={pos.currency} type={pos.type} />
-                      {pos.notes && <div className="text-[9px] text-gray-600 mt-1 italic">{pos.notes}</div>}
+                    <td className="px-4 py-3 max-w-[220px]">
+                      <div className="w-full overflow-hidden">
+                        <TriggerRail price={pos.price} addLevels={pos.addLevels} trimLevels={pos.trimLevels} status={pos.status} currency={pos.currency} type={pos.type} />
+                        {pos.notes && <div className="text-[10px] text-gray-600 mt-1 italic line-clamp-2 break-words">{pos.notes}</div>}
+                      </div>
                     </td>
                     <td className="px-3 py-3"><StatusBadge status={pos.status} /></td>
                     <td className="px-2 py-3">
