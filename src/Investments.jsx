@@ -329,42 +329,41 @@ export default function Investments({ accounts = [] }) {
       } catch { fail++; }
     }
 
-    // 2. Stocks via Stooq CSV (CORS-friendly, no API key needed)
-    const stooqMap = {
-      AMD: 'amd.us', NVDA: 'nvda.us', AVGO: 'avgo.us', META: 'meta.us',
-      AMZN: 'amzn.us', NOW: 'now.us', CAKE: 'cake.us', CSPX: 'cspx.uk',
-      DHER: 'dher.de', SOFI: 'sofi.us',
+    // 2. Stocks via Yahoo Finance chart endpoint (per-symbol, parallel)
+    const yahooMap = {
+      AMD: 'AMD', NVDA: 'NVDA', AVGO: 'AVGO', META: 'META',
+      AMZN: 'AMZN', NOW: 'NOW', CAKE: 'CAKE', CSPX: 'CSPX.L',
+      DHER: 'DHER.DE', SOFI: 'SOFI',
     };
     const stockPositions = updated.filter(p => p.type === 'STK' || p.type === 'ETF');
-    const stooqSymbols = [...new Set(stockPositions.map(p => stooqMap[p.ticker]).filter(Boolean))];
-    if (stooqSymbols.length) {
-      try {
+    const seenTickers = new Set();
+    const uniqueStocks = stockPositions.filter(p => {
+      if (seenTickers.has(p.ticker) || !yahooMap[p.ticker]) return false;
+      seenTickers.add(p.ticker);
+      return true;
+    });
+
+    const fetchResults = await Promise.allSettled(
+      uniqueStocks.map(async p => {
+        const yt = yahooMap[p.ticker];
         const r = await fetch(
-          `https://stooq.com/q/l/?s=${stooqSymbols.join(',')}&f=sd2t2ohlcv&h&e=csv`
+          `https://query2.finance.yahoo.com/v8/finance/chart/${yt}?interval=1d&range=1d`
         );
-        const text = await r.text();
-        const lines = text.trim().split('\n');
-        if (lines.length > 1) {
-          const hdrs = lines[0].toLowerCase().split(',');
-          const symI = hdrs.indexOf('symbol');
-          const closeI = hdrs.indexOf('close');
-          const revMap = {};
-          Object.entries(stooqMap).forEach(([t, s]) => { revMap[s.toUpperCase()] = t; });
-          for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].split(',');
-            const sym = (cols[symI] || '').trim().toUpperCase();
-            const close = parseFloat(cols[closeI]);
-            const ticker = revMap[sym];
-            if (!ticker || isNaN(close) || close <= 0) continue;
-            updated.forEach((p, idx) => {
-              if (p.ticker === ticker) { updated[idx] = { ...p, price: close }; ok++; }
-            });
-          }
-        }
-      } catch {
-        fail++;
-      }
-    }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const d = await r.json();
+        const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (!price || price <= 0) throw new Error('no price');
+        return { ticker: p.ticker, price };
+      })
+    );
+
+    fetchResults.forEach(res => {
+      if (res.status !== 'fulfilled') { fail++; return; }
+      const { ticker, price } = res.value;
+      updated.forEach((p, i) => {
+        if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
+      });
+    });
 
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const newData = { ...data, positions: updated, config: { ...data.config, lastUpdated: new Date().toISOString() } };
