@@ -183,17 +183,30 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     .filter(tx => tx.type === 'expense' && periodTxFilter(tx))
     .reduce((s, tx) => s + toAED(tx.amount, tx.currency), 0);
   const periodSavings = periodIncome - periodExpenses;
-  const periodBudget = totalMonthlyBudget * periodMonths;
-
   // Per-category spending for this period
   const periodByCat = {};
   transactions.filter(tx => tx.type === 'expense' && periodTxFilter(tx)).forEach(tx => {
     periodByCat[tx.category] = (periodByCat[tx.category] || 0) + toAED(tx.amount, tx.currency);
   });
 
-  // Per-category budget scaled to period
+  // Per-category budget for this period — sum effective budget per month (matches BudgetGrid)
   const periodBudgetCat = {};
-  Object.entries(budgetMap).forEach(([cat, v]) => { periodBudgetCat[cat] = v * periodMonths; });
+  const allBudgetCats = [...new Set(budgets.map(b => b.category))];
+  if (viewMode === 'month') {
+    allBudgetCats.forEach(cat => { periodBudgetCat[cat] = budgetMap[cat] || 0; });
+  } else {
+    const endMonth = viewMode === 'ytd' ? periodMonths : 12;
+    allBudgetCats.forEach(cat => {
+      let total = 0;
+      for (let m = 1; m <= endMonth; m++) {
+        const ov = budgets.find(b => b.category === cat && b.month && parseInt(b.month) === m && parseInt(b.year) === viewYear);
+        const def = budgets.find(b => b.category === cat && !b.month);
+        total += ov ? ov.monthlyLimit : (def?.monthlyLimit ?? 0);
+      }
+      periodBudgetCat[cat] = total;
+    });
+  }
+  const periodBudget = Object.values(periodBudgetCat).reduce((a, b) => a + b, 0);
 
   // Pace % for the current period (how far through it are we?)
   const rawPacePct = (() => {
