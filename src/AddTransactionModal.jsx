@@ -134,15 +134,22 @@ function parseStatementCSV(text) {
     const date   = parseDateStr(dateStr);
     const amount = parseFloat(amountRaw);
 
-    if (!date || isNaN(amount) || amount <= 0 || !details) continue;
-    // Skip credit entries (money coming in, e.g. refunds/payments to card)
-    if (debitCredit && debitCredit.toLowerCase().includes('credit') && !debitCredit.toLowerCase().includes('debit/credit')) continue;
+    if (!date || isNaN(amount) || amount === 0 || !details) continue;
+
+    // Some banks label charges as "Credit" with a negative amount (credit to card = debt increases).
+    // Skip only positive-credit entries (genuine refunds/payments coming in).
+    const isCredit = debitCredit &&
+      debitCredit.toLowerCase().includes('credit') &&
+      !debitCredit.toLowerCase().includes('debit/credit');
+    if (isCredit && amount > 0) continue;
+
+    const absAmount = Math.abs(amount);
 
     rows.push({
       id: `r${i}`,
       date,
       description: details,
-      amount,
+      amount: absAmount,
       currency: currency.trim().toUpperCase(),
       status: status.toUpperCase(),
       category: suggestCategory(details),
