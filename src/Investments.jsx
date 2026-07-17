@@ -95,6 +95,8 @@ const TICKER_URLS = {
   CAKE:   'https://twelvedata.com/markets/248250/stock/nasdaq/cake',
   CSPX:   'https://twelvedata.com/markets/687510/etf/lse/cspx',
   SOL:    'https://twelvedata.com/markets/722279/crypto/binance/sol-usd',
+  ETH:    'https://twelvedata.com/markets/679245/crypto/binance/eth-usd',
+  SHIB:   'https://twelvedata.com/markets/870480/crypto/coinbase-pro/shib-usd',
   DHER:   'https://twelvedata.com/markets/145211/stock/xetr/dher',
   TALABAT: 'https://www.tradingview.com/symbols/DFM-TALABAT/',
 };
