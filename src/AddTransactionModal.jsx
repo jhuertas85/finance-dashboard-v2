@@ -660,25 +660,11 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                 {/* Summary bar */}
                 {(() => {
                   const netAED = includedRows.reduce((s, r) => s + toAED(r.amount, r.currency), 0);
-                  const refundRows = includedRows.filter(r => r.amount < 0);
-                  const expenseAED = includedRows.filter(r => r.amount >= 0).reduce((s, r) => s + toAED(r.amount, r.currency), 0);
-                  const refundAED  = refundRows.reduce((s, r) => s + toAED(Math.abs(r.amount), r.currency), 0);
                   const fmtAED = v => `AED ${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                   return (
-                    <div className="bg-neutral-800 rounded-xl px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 items-center">
-                      <div>
-                        <span className="text-xs text-gray-500 uppercase font-bold mr-2">Total to import</span>
-                        <span className="text-white font-bold text-sm">{fmtAED(netAED)}</span>
-                      </div>
-                      {refundRows.length > 0 && (
-                        <div className="text-xs">
-                          <span className="text-gray-500 mr-1">Expenses</span>
-                          <span className="text-red-400 font-mono">{fmtAED(expenseAED)}</span>
-                          <span className="text-gray-600 mx-1.5">·</span>
-                          <span className="text-gray-500 mr-1">Refunds</span>
-                          <span className="text-purple-400 font-mono">−{fmtAED(refundAED)}</span>
-                        </div>
-                      )}
+                    <div className="bg-neutral-800 rounded-xl px-4 py-3 flex items-center justify-between">
+                      <span className="text-xs text-gray-500 uppercase font-bold">Total to import</span>
+                      <span className="text-white font-bold text-sm">{fmtAED(netAED)}</span>
                     </div>
                   );
                 })()}
