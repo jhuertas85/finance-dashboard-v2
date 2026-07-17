@@ -333,29 +333,31 @@ export default function Investments({ accounts = [] }) {
     }
 
     // 2. Stocks via Twelve Data (free key at twelvedata.com — 800 calls/day)
-    const twelveMap = {
-      AMD: 'AMD', NVDA: 'NVDA', AVGO: 'AVGO', META: 'META',
-      AMZN: 'AMZN', NOW: 'NOW', CAKE: 'CAKE',
-      CSPX: 'CSPX:LSE', DHER: 'DHER:XETR',
-    };
-    if (apiKey) {
+    // US stocks and international stocks fetched separately so one failing doesn't block the other
+    const twelveUSMap   = { AMD: 'AMD', NVDA: 'NVDA', AVGO: 'AVGO', META: 'META', AMZN: 'AMZN', NOW: 'NOW', CAKE: 'CAKE' };
+    const twelveIntlMap = { CSPX: 'CSPX:LSE', DHER: 'DHER:XETR' };
+
+    async function fetchTwelve(map) {
       const stockPositions = updated.filter(p => p.type === 'STK' || p.type === 'ETF');
-      const syms = [...new Set(stockPositions.map(p => twelveMap[p.ticker]).filter(Boolean))];
-      try {
-        const r = await fetch(
-          `https://api.twelvedata.com/price?symbol=${syms.join(',')}&apikey=${apiKey}`
-        );
-        const resp = await r.json();
-        // Single symbol → { price: "X" }, multiple → { AMD: { price: "X" }, ... }
-        const bySymbol = syms.length === 1 ? { [syms[0]]: resp } : resp;
-        Object.entries(twelveMap).forEach(([ticker, sym]) => {
-          const price = parseFloat(bySymbol[sym]?.price);
-          if (!price || price <= 0 || isNaN(price)) return;
-          updated.forEach((p, i) => {
-            if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
-          });
+      const syms = [...new Set(stockPositions.map(p => map[p.ticker]).filter(Boolean))];
+      if (!syms.length) return;
+      const r = await fetch(`https://api.twelvedata.com/price?symbol=${syms.join(',')}&apikey=${apiKey}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const resp = await r.json();
+      if (resp.code) throw new Error(resp.message || 'API error'); // top-level error from Twelve Data
+      const bySymbol = syms.length === 1 ? { [syms[0]]: resp } : resp;
+      Object.entries(map).forEach(([ticker, sym]) => {
+        const price = parseFloat(bySymbol[sym]?.price);
+        if (!price || price <= 0 || isNaN(price)) return;
+        updated.forEach((p, i) => {
+          if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
         });
-      } catch { fail++; }
+      });
+    }
+
+    if (apiKey) {
+      try { await fetchTwelve(twelveUSMap); } catch { fail++; }
+      try { await fetchTwelve(twelveIntlMap); } catch { /* international may not be on free plan */ }
     }
 
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
