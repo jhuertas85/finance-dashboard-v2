@@ -329,27 +329,38 @@ export default function Investments({ accounts = [] }) {
       } catch { fail++; }
     }
 
-    // 2. Stocks via Yahoo Finance (try — may fail due to CORS)
+    // 2. Stocks via Stooq CSV (CORS-friendly, no API key needed)
+    const stooqMap = {
+      AMD: 'amd.us', NVDA: 'nvda.us', AVGO: 'avgo.us', META: 'meta.us',
+      AMZN: 'amzn.us', NOW: 'now.us', CAKE: 'cake.us', CSPX: 'cspx.uk',
+      DHER: 'dher.de', SOFI: 'sofi.us',
+    };
     const stockPositions = updated.filter(p => p.type === 'STK' || p.type === 'ETF');
-    const yahooMap = { AMD: 'AMD', NVDA: 'NVDA', AVGO: 'AVGO', META: 'META', AMZN: 'AMZN', NOW: 'NOW', CAKE: 'CAKE', CSPX: 'CSPX.L', DHER: 'DHER.DE', SOFI: 'SOFI' };
-    const yTickers = [...new Set(stockPositions.map(p => yahooMap[p.ticker]).filter(Boolean))];
-    if (yTickers.length) {
+    const stooqSymbols = [...new Set(stockPositions.map(p => stooqMap[p.ticker]).filter(Boolean))];
+    if (stooqSymbols.length) {
       try {
         const r = await fetch(
-          `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${yTickers.join(',')}`,
-          { headers: { 'User-Agent': 'Mozilla/5.0' } }
+          `https://stooq.com/q/l/?s=${stooqSymbols.join(',')}&f=sd2t2ohlcv&h&e=csv`
         );
-        const d = await r.json();
-        const quotes = d?.quoteResponse?.result || [];
-        quotes.forEach(q => {
-          const ticker = Object.entries(yahooMap).find(([, yt]) => yt === q.symbol)?.[0];
-          if (!ticker) return;
-          const price = q.regularMarketPrice;
-          if (!price) return;
-          updated.forEach((p, i) => {
-            if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
-          });
-        });
+        const text = await r.text();
+        const lines = text.trim().split('\n');
+        if (lines.length > 1) {
+          const hdrs = lines[0].toLowerCase().split(',');
+          const symI = hdrs.indexOf('symbol');
+          const closeI = hdrs.indexOf('close');
+          const revMap = {};
+          Object.entries(stooqMap).forEach(([t, s]) => { revMap[s.toUpperCase()] = t; });
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',');
+            const sym = (cols[symI] || '').trim().toUpperCase();
+            const close = parseFloat(cols[closeI]);
+            const ticker = revMap[sym];
+            if (!ticker || isNaN(close) || close <= 0) continue;
+            updated.forEach((p, idx) => {
+              if (p.ticker === ticker) { updated[idx] = { ...p, price: close }; ok++; }
+            });
+          }
+        }
       } catch {
         fail++;
       }
@@ -359,7 +370,7 @@ export default function Investments({ accounts = [] }) {
     const newData = { ...data, positions: updated, config: { ...data.config, lastUpdated: new Date().toISOString() } };
     await persist(newData);
     await syncToAccounts(updated);
-    setPriceMsg(fail > 0 ? `Crypto updated · Stocks need manual update (CORS) · ${now}` : `Prices updated · ${ok} tickers · ${now}`);
+    setPriceMsg(fail > 0 ? `Partial update · ${ok} tickers · some sources failed · ${now}` : `All prices updated · ${ok} tickers · ${now}`);
     setRefreshing(false);
   }
 
