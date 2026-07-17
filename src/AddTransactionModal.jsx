@@ -326,6 +326,8 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
           ...row,
           isDuplicate,
           matchedBill: matchedBill || null,
+          linkedBillId: matchedBill?.id || null,
+          notes: '',
           include: !isDuplicate && row.status !== 'REVERSED',
           category: matchedBill?.category || row.category,
         };
@@ -350,6 +352,8 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
     try {
       for (const row of toImport) {
         const aedAmt = toAED(row.amount, row.currency);
+        const linkedBill = recurringBills.find(b => b.id === row.linkedBillId);
+        const autoNote = linkedBill ? `Recurring: ${linkedBill.name}` : '';
         await addDoc(collection(db, 'transactions'), {
           date: new Date(row.date + 'T12:00:00').toISOString(),
           description: row.description,
@@ -359,7 +363,8 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
           currency: row.currency,
           fromAccount: acct?.id || importAccountId,
           toAccount: null,
-          notes: row.matchedBill ? `Recurring: ${row.matchedBill.name}` : '',
+          notes: row.notes.trim() || autoNote,
+          recurringBillId: row.linkedBillId || null,
           reconciled: false,
           source: 'import',
         });
@@ -378,7 +383,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   // ── Derived import stats
   const includedRows  = importRows.filter(r => r.include);
   const dupRows       = importRows.filter(r => r.isDuplicate);
-  const billRows      = importRows.filter(r => r.matchedBill);
+  const billRows      = importRows.filter(r => r.linkedBillId);
   const reversedRows  = importRows.filter(r => r.status === 'REVERSED');
 
   const isImportTab = tab === 'import';
@@ -660,7 +665,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                 </div>
 
                 <div className="overflow-auto max-h-[50vh] rounded-xl border border-neutral-800">
-                  <table className="w-full text-xs min-w-[700px]">
+                  <table className="w-full text-xs min-w-[860px]">
                     <thead className="sticky top-0 bg-neutral-900 z-10">
                       <tr className="border-b border-neutral-800">
                         <th className="py-2 px-2 w-8">
@@ -674,13 +679,14 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                         <th className="py-2 px-2 text-gray-500 font-semibold w-20">Status</th>
                         <th className="py-2 px-2 text-right text-gray-500 font-semibold">Amount</th>
                         <th className="py-2 px-2 text-left text-gray-500 font-semibold w-44">Category</th>
-                        <th className="py-2 px-2 text-gray-500 font-semibold w-28">Notes</th>
+                        <th className="py-2 px-2 text-left text-gray-500 font-semibold w-40">Recurring Bill</th>
+                        <th className="py-2 px-2 text-left text-gray-500 font-semibold w-32">Notes</th>
                       </tr>
                     </thead>
                     <tbody>
                       {importRows.map(row => (
                         <tr key={row.id}
-                          className={`border-b border-neutral-900 ${!row.include ? 'opacity-40' : row.isDuplicate ? 'bg-amber-950/20' : row.matchedBill ? 'bg-purple-950/20' : ''}`}>
+                          className={`border-b border-neutral-900 ${!row.include ? 'opacity-40' : row.isDuplicate ? 'bg-amber-950/20' : row.linkedBillId ? 'bg-purple-950/20' : ''}`}>
                           <td className="py-2 px-2 text-center">
                             <input type="checkbox" checked={row.include}
                               onChange={e => updateImportRow(row.id, { include: e.target.checked })}
@@ -705,9 +711,27 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                               {CATEGORIES.map(c => <option key={c} value={c}>{getCategoryEmoji(c)} {c}</option>)}
                             </select>
                           </td>
-                          <td className="py-2 px-2 text-[11px]">
-                            {row.isDuplicate && <span className="text-amber-400" title="Possible duplicate — already exists near this date/amount">⚠ Duplicate?</span>}
-                            {!row.isDuplicate && row.matchedBill && <span className="text-purple-400" title={`Matches recurring bill: ${row.matchedBill.name}`}>🔄 {row.matchedBill.name}</span>}
+                          <td className="py-2 px-2 w-40">
+                            <select
+                              value={row.linkedBillId || ''}
+                              onChange={e => updateImportRow(row.id, { linkedBillId: e.target.value || null })}
+                              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-1.5 py-1 text-white text-[11px]">
+                              <option value="">— Not recurring —</option>
+                              {recurringBills.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                              ))}
+                            </select>
+                            {row.isDuplicate && (
+                              <span className="block text-[10px] text-amber-400 mt-0.5">⚠ Possible duplicate</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 w-32">
+                            <input
+                              type="text"
+                              value={row.notes || ''}
+                              onChange={e => updateImportRow(row.id, { notes: e.target.value })}
+                              placeholder="Add note…"
+                              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-1.5 py-1 text-gray-300 text-[11px] placeholder-gray-600" />
                           </td>
                         </tr>
                       ))}
