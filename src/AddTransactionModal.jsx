@@ -143,13 +143,11 @@ function parseStatementCSV(text) {
       !debitCredit.toLowerCase().includes('debit/credit');
     if (isCredit && amount > 0) continue;
 
-    const absAmount = Math.abs(amount);
-
     rows.push({
       id: `r${i}`,
       date,
       description: details,
-      amount: absAmount,
+      amount,
       currency: currency.trim().toUpperCase(),
       status: status.toUpperCase(),
       category: suggestCategory(details),
