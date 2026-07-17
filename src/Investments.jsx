@@ -78,8 +78,21 @@ const SEED = {
     { id: 'c98-c', ticker: 'C98', platform: 'Binance', type: 'CRY', closedDate: '18 Jun 24', qty: 57.99, sellPrice: '$0.05', costAED: 200, proceeds: 3, gainLoss: -197, pct: -98.6 },
     { id: 'luna-c', ticker: 'LUNA', platform: 'Binance', type: 'CRY', closedDate: '12 May 22', qty: 112.1, sellPrice: '$0', costAED: 200, proceeds: 0, gainLoss: -200, pct: -100 },
   ],
-  config: { dryCash: 5500, addPriority: 'NVDA → AVGO → META → AMD → AMZN → NOW', lastUpdated: null },
+  config: { dryCash: 5500, addPriority: 'NVDA → AVGO → META → AMD → AMZN → NOW', lastUpdated: null, analysisDate: '2026-07-17T14:00:00.000Z' },
 };
+
+// Analysis fields driven by code — merged over Firestore on every load
+const ANALYSIS_FIELDS = ['status', 'addLevels', 'trimLevels', 'notes'];
+function mergeAnalysis(firestoreData) {
+  const positions = (firestoreData.positions || []).map(fsPos => {
+    const seed = SEED.positions.find(s => s.id === fsPos.id);
+    if (!seed) return fsPos;
+    const overrides = {};
+    ANALYSIS_FIELDS.forEach(f => { overrides[f] = seed[f]; });
+    return { ...fsPos, ...overrides };
+  });
+  return { ...firestoreData, positions, config: { ...firestoreData.config, analysisDate: SEED.config.analysisDate } };
+}
 
 // ─── CoinGecko IDs ────────────────────────────────────────────────────────────
 const CG_IDS = { SOL: 'solana', ETH: 'ethereum', SHIB: 'shiba-inu', SHIBA: 'shiba-inu', BTC: 'bitcoin', AVAX: 'avalanche-2' };
@@ -304,7 +317,7 @@ export default function Investments({ accounts = [] }) {
   useEffect(() => {
     const ref = doc(db, 'investments', 'main');
     getDoc(ref).then(snap => {
-      if (snap.exists()) setData(snap.data());
+      if (snap.exists()) setData(mergeAnalysis(snap.data()));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -458,6 +471,9 @@ export default function Investments({ accounts = [] }) {
   const lastUpdated = data.config?.lastUpdated
     ? new Date(data.config.lastUpdated).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
     : null;
+  const lastAnalysis = data.config?.analysisDate
+    ? new Date(data.config.analysisDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
+    : null;
 
   if (loading) return <div className="flex items-center justify-center py-20 text-gray-500">Loading investments…</div>;
 
@@ -471,7 +487,10 @@ export default function Investments({ accounts = [] }) {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-lg font-bold text-white tracking-tight">Investment Command</h2>
-          {lastUpdated && <p className="text-xs text-gray-600 mt-0.5">Prices as of {lastUpdated}</p>}
+          <p className="text-xs text-gray-600 mt-0.5 flex gap-2">
+            {lastUpdated && <span>Prices as of {lastUpdated}</span>}
+            {lastAnalysis && <><span className="text-gray-700">·</span><span>Analysis {lastAnalysis}</span></>}
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {saving && <span className="text-xs text-gray-500">Saving…</span>}
