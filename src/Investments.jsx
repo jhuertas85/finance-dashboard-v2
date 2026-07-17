@@ -472,7 +472,7 @@ export default function Investments({ accounts = [] }) {
     ? new Date(data.config.lastUpdated).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
     : null;
   const lastAnalysis = data.config?.analysisDate
-    ? new Date(data.config.analysisDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
+    ? new Date(data.config.analysisDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
     : null;
 
   if (loading) return <div className="flex items-center justify-center py-20 text-gray-500">Loading investments…</div>;
