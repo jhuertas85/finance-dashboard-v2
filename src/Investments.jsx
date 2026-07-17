@@ -84,6 +84,21 @@ const SEED = {
 // ─── CoinGecko IDs ────────────────────────────────────────────────────────────
 const CG_IDS = { SOL: 'solana', ETH: 'ethereum', SHIB: 'shiba-inu', SHIBA: 'shiba-inu', BTC: 'bitcoin', AVAX: 'avalanche-2' };
 
+// ─── External chart links ─────────────────────────────────────────────────────
+const TICKER_URLS = {
+  AMD:     'https://twelvedata.com/markets/100880/stock/nasdaq/amd',
+  NVDA:    'https://twelvedata.com/markets/543571/stock/nasdaq/nvda',
+  AVGO:    'https://twelvedata.com/markets/812838/stock/nasdaq/avgo',
+  META:    'https://twelvedata.com/markets/872095/stock/nasdaq/meta',
+  AMZN:   'https://twelvedata.com/markets/816951/stock/nasdaq/amzn',
+  NOW:    'https://twelvedata.com/markets/336148/stock/nyse/now',
+  CAKE:   'https://twelvedata.com/markets/248250/stock/nasdaq/cake',
+  CSPX:   'https://twelvedata.com/markets/687510/etf/lse/cspx',
+  SOL:    'https://twelvedata.com/markets/722279/crypto/binance/sol-usd',
+  DHER:   'https://twelvedata.com/markets/145211/stock/xetr/dher',
+  TALABAT: 'https://www.tradingview.com/symbols/DFM-TALABAT/',
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function TypeBadge({ type }) {
   const s = { STK: 'bg-blue-900/60 text-blue-300 border-blue-700/50', CRY: 'bg-amber-900/60 text-amber-300 border-amber-700/50', ETF: 'bg-purple-900/60 text-purple-300 border-purple-700/50', WLT: 'bg-teal-900/60 text-teal-300 border-teal-700/50' };
@@ -571,7 +586,16 @@ export default function Investments({ accounts = [] }) {
                         <TypeBadge type={pos.type} />
                         <div>
                           <div className="flex items-center gap-1">
-                            <span className="font-bold text-white text-sm leading-none">{pos.ticker}</span>
+                            {TICKER_URLS[pos.ticker] ? (
+                              <a
+                                href={TICKER_URLS[pos.ticker]}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-bold text-white text-sm leading-none hover:text-emerald-400 transition underline-offset-2 hover:underline"
+                              >{pos.ticker}</a>
+                            ) : (
+                              <span className="font-bold text-white text-sm leading-none">{pos.ticker}</span>
+                            )}
                             {(pos.isGrant || pos.isEmployerStock) && (
                               <span className="text-[9px] bg-amber-900/50 text-amber-400 px-1 rounded font-mono">{pos.isGrant ? 'grant' : 'employer'}</span>
                             )}
