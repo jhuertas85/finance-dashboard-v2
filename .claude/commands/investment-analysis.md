@@ -8,22 +8,26 @@ Read `src/Investments.jsx` and extract every entry in the `SEED.positions` array
 
 ## Step 2 — Web search for EVERY position (mandatory)
 
-For each active position run at minimum these searches. You MUST use the WebSearch tool — never skip this step or rely only on training knowledge.
+You MUST use the WebSearch tool for every position. Never rely solely on training knowledge — always get current online data. Run searches in parallel where possible.
 
-For stocks (STK/ETF):
-- `"{TICKER} stock price analyst target forecast {CURRENT_MONTH} {CURRENT_YEAR}"`
-- `"{TICKER} stock news {CURRENT_MONTH} {CURRENT_YEAR}"`
+For each **stock / ETF** ticker, run ALL of the following:
+1. `"{TICKER} stock price today {CURRENT_MONTH} {CURRENT_YEAR}"` — current price
+2. `"{TICKER} analyst price target consensus {CURRENT_MONTH} {CURRENT_YEAR}"` — Wall St consensus, upgrades/downgrades, price target range
+3. `"{TICKER} earnings results forecast {CURRENT_YEAR}"` — latest earnings beat/miss, next earnings date, revenue/EPS trajectory
+4. `"{TICKER} news catalyst {CURRENT_MONTH} {CURRENT_YEAR}"` — recent news, product launches, M&A, macro events affecting the stock
+5. `"{TICKER} stock outlook sector trend {CURRENT_YEAR}"` — sector tailwinds/headwinds, competitive positioning, institutional sentiment
 
-For crypto (CRY):
-- `"{TICKER} crypto price prediction analyst {CURRENT_MONTH} {CURRENT_YEAR}"`
+For each **crypto** ticker, run ALL of the following:
+1. `"{TICKER} crypto price {CURRENT_MONTH} {CURRENT_YEAR}"` — current price
+2. `"{TICKER} price prediction analyst target {CURRENT_YEAR}"` — analyst/fund targets, on-chain metrics
+3. `"{TICKER} crypto news catalyst {CURRENT_MONTH} {CURRENT_YEAR}"` — network upgrades, regulatory news, adoption news
+4. `"{TICKER} crypto market sentiment {CURRENT_MONTH} {CURRENT_YEAR}"` — fear/greed, community sentiment, trending narrative
 
 Tickers to cover: AMD, NVDA, AVGO, META, AMZN, NOW, CAKE, CSPX, SOL, ETH, SHIB, DHER, TALABAT
 
-Run searches in parallel where possible to save time.
-
 ## Step 3 — Analyse each position
 
-Using the web data + the position's current P&L, determine for each position:
+Using ALL web data gathered — current price, analyst consensus, earnings trajectory, recent news/catalysts, sector trends, competitive positioning, community sentiment, technical levels, and the position's current P&L vs cost basis — determine for each position:
 
 **`status`** — one of:
 - `ACCUMULATE` — meaningful upside to consensus, near/below cost, or strong buy by analysts
