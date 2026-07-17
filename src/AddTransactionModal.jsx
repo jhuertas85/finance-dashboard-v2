@@ -658,17 +658,8 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
             {importRows.length > 0 && (
               <>
                 {/* Summary bar */}
-                {(() => {
-                  const netAED = includedRows.reduce((s, r) => s + toAED(r.amount, r.currency), 0);
-                  const fmtAED = v => `AED ${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                  return (
-                    <div className="bg-neutral-800 rounded-xl px-4 py-3 flex items-center justify-between">
-                      <span className="text-xs text-gray-500 uppercase font-bold">Total to import</span>
-                      <span className="text-white font-bold text-sm">{fmtAED(netAED)}</span>
-                    </div>
-                  );
-                })()}
                 <div className="flex flex-wrap gap-3 text-xs items-center">
+                  <span className="text-white font-bold">AED {includedRows.reduce((s, r) => s + toAED(r.amount, r.currency), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   <span className="text-emerald-400 font-semibold">{includedRows.length} to import</span>
                   {dupRows.length > 0 && <span className="text-amber-400">⚠ {dupRows.length} possible duplicate{dupRows.length > 1 ? 's' : ''}</span>}
                   {billRows.length > 0 && <span className="text-purple-400">🔄 {billRows.length} match recurring bill{billRows.length > 1 ? 's' : ''}</span>}
