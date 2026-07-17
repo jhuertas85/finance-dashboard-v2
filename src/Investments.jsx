@@ -140,7 +140,18 @@ function TriggerRail({ price, addLevels, trimLevels, status, currency, type }) {
 
   if (!addLevel && trimLevel) {
     const d = ((trimLevel - price) / price * 100).toFixed(0);
-    return <div className="text-[10px]"><span className="text-gray-500">Trim only · </span><span className="text-emerald-400 font-mono">{fmtLvl(trimLevel)}</span><span className="text-gray-500"> (+{d}%) · no adds</span></div>;
+    return (
+      <div className="w-full">
+        <div className="relative h-1.5 rounded-full" style={{ background: 'linear-gradient(90deg,#1f2937 0%,#1f2937 60%,rgba(52,211,153,.1) 80%,rgba(52,211,153,.5) 100%)', border: '1px solid #374151' }}>
+          <div className="absolute w-2.5 h-2.5 rounded-full bg-amber-400 border-2 border-black" style={{ left: '5%', top: '50%', transform: 'translate(-50%,-50%)', boxShadow: '0 0 6px rgba(245,177,76,.8)' }} />
+        </div>
+        <div className="flex justify-between text-[9px] mt-1.5">
+          <span className="text-amber-400">now {fmtNow(price)}</span>
+          <span className="text-emerald-400">trim {fmtLvl(trimLevel)}</span>
+        </div>
+        <div className="text-[9px] text-gray-600 mt-0.5">+{d}% to trim · no adds</div>
+      </div>
+    );
   }
 
   let pct = (price - addLevel) / ((trimLevel || price * 1.2) - addLevel) * 100;
