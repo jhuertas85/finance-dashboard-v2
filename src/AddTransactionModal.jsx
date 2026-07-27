@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import { toAED, getCategoryEmoji } from './utils.js';
@@ -161,8 +161,18 @@ function parseStatementCSV(text) {
   return { rows };
 }
 
+function billDueLabel(bill) {
+  if (bill.dueDay != null) return `Due: ${ordinal(parseInt(bill.dueDay))}`;
+  if (bill.dueDate) {
+    const d = new Date(bill.dueDate);
+    return `Due: ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+  }
+  return null;
+}
+
 // ── BillCard: top-level so React never remounts on parent re-render ───────────
 function BillCard({ bill, isOverdue, billAmounts, setBillAmounts, payRecurringBill, saving, nbdCreditAccount }) {
+  const dueLabel = billDueLabel(bill);
   return (
     <div className={`rounded-xl border px-4 py-3 ${isOverdue ? 'border-red-800 bg-red-950/20' : 'border-neutral-700 bg-neutral-800'}`}>
       <div className="flex items-start justify-between gap-3 mb-2">
@@ -171,7 +181,7 @@ function BillCard({ bill, isOverdue, billAmounts, setBillAmounts, payRecurringBi
           <p className="text-xs text-gray-500">
             {bill.category}
             {nbdCreditAccount ? ` · ${nbdCreditAccount.name}` : ''}
-            {bill.dueDay != null ? ` · Due: ${ordinal(parseInt(bill.dueDay))}` : ''}
+            {dueLabel ? ` · ${dueLabel}` : ''}
           </p>
         </div>
       </div>
@@ -219,24 +229,42 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const [error, setError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
 
+  // ── Last known amount per bill — from Firestore bill.amount or most recent matching transaction
+  const lastKnownAmounts = useMemo(() => {
+    const m = {};
+    recurringBills.forEach(bill => {
+      if (bill.amount != null && bill.amount !== 0) { m[bill.id] = bill.amount; return; }
+      const match = transactions
+        .filter(tx => tx.recurringBillId === bill.id || (
+          tx.type === 'expense' && tx.notes === 'Recurring bill' &&
+          (tx.description || '').toLowerCase().trim() === (bill.name || '').toLowerCase().trim()
+        ))
+        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+      if (match) m[bill.id] = match.amount;
+    });
+    return m;
+  }, [transactions, recurringBills]);
+
   // ── Recurring bills tab state
   const [billAmounts, setBillAmounts] = useState(() => {
     const m = {};
-    recurringBills.forEach(b => { m[b.id] = b.amount != null && b.amount !== 0 ? String(b.amount) : ''; });
+    recurringBills.forEach(b => { m[b.id] = ''; });
     return m;
   });
 
-  // Sync when recurringBills loads async from Firestore — only fills empty slots, never overwrites user edits
+  // Sync amounts when data loads — only fills empty/zero slots, never overwrites user edits
   useEffect(() => {
     setBillAmounts(prev => {
       const next = { ...prev };
       recurringBills.forEach(b => {
-        if ((!next[b.id] || next[b.id] === '0') && b.amount != null && b.amount !== 0)
-          next[b.id] = String(b.amount);
+        if (!next[b.id] || next[b.id] === '0') {
+          const val = lastKnownAmounts[b.id];
+          if (val != null) next[b.id] = String(val);
+        }
       });
       return next;
     });
-  }, [recurringBills]);
+  }, [recurringBills, lastKnownAmounts]);
 
   // ── Import tab state
   const [importRows, setImportRows] = useState([]);
@@ -257,18 +285,27 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const toCurrency   = toAcct?.currency   || fromCurrency;
   const isCrossCurrency = type === 'transfer' && !!toAcct && fromCurrency !== toCurrency;
 
-  // Paid-this-month detection: check by recurringBillId (reliable) or description fallback
-  const thisMonthTx = transactions.filter(tx => {
-    const d = new Date(tx.date);
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && tx.type === 'expense';
-  });
-  const thisMonthDescs = thisMonthTx.map(tx => (tx.description || '').toLowerCase().trim());
-  const thisMonthBillIds = new Set(thisMonthTx.map(tx => tx.recurringBillId).filter(Boolean));
+  // Paid-this-month detection: only match transactions explicitly saved via Pay Now
+  // (by recurringBillId, or by old notes='Recurring bill' + exact description match)
+  const thisMonthTx = useMemo(() => {
+    return transactions.filter(tx => {
+      const d = new Date(tx.date);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && tx.type === 'expense';
+    });
+  }, [transactions]);
+
+  const thisMonthBillIds = useMemo(
+    () => new Set(thisMonthTx.map(tx => tx.recurringBillId).filter(Boolean)),
+    [thisMonthTx]
+  );
 
   function isBillPaid(bill) {
     if (thisMonthBillIds.has(bill.id)) return true;
     const name = (bill.name || '').toLowerCase().trim();
-    return thisMonthDescs.some(desc => desc === name || desc.includes(name) || name.includes(desc));
+    return thisMonthTx.some(tx =>
+      tx.notes === 'Recurring bill' &&
+      (tx.description || '').toLowerCase().trim() === name
+    );
   }
 
   function reset() { setDescription(''); setAmountExpr(''); setAmountToExpr(''); setNotes(''); setBorrower(''); setError(''); }
@@ -603,8 +640,14 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
               const paid     = recurringBills.filter(b => isBillPaid(b));
               const paidIds  = new Set(paid.map(b => b.id));
               const unpaid   = recurringBills.filter(b => !paidIds.has(b.id));
-              const overdue  = unpaid.filter(b => b.dueDay != null && parseInt(b.dueDay) <= todayDay);
-              const upcoming = unpaid.filter(b => b.dueDay == null || parseInt(b.dueDay) > todayDay);
+
+              function daysUntilDue(bill) {
+                if (bill.dueDate) return Math.ceil((new Date(bill.dueDate) - now) / 86400000);
+                if (bill.dueDay != null) return parseInt(bill.dueDay) - todayDay;
+                return null;
+              }
+              const overdue  = unpaid.filter(b => { const d = daysUntilDue(b); return d != null && d < 0; });
+              const upcoming = unpaid.filter(b => { const d = daysUntilDue(b); return d == null || d >= 0; });
 
               return (
                 <>
