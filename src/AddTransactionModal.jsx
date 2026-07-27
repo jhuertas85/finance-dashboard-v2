@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import { toAED, getCategoryEmoji } from './utils.js';
@@ -189,9 +189,21 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   // ── Recurring bills tab state
   const [billAmounts, setBillAmounts] = useState(() => {
     const m = {};
-    recurringBills.forEach(b => { m[b.id] = String(b.amount || ''); });
+    recurringBills.forEach(b => { m[b.id] = b.amount != null && b.amount !== 0 ? String(b.amount) : ''; });
     return m;
   });
+
+  // Sync when recurringBills loads async from Firestore — only fills empty slots, never overwrites user edits
+  useEffect(() => {
+    setBillAmounts(prev => {
+      const next = { ...prev };
+      recurringBills.forEach(b => {
+        if ((!next[b.id] || next[b.id] === '0') && b.amount != null && b.amount !== 0)
+          next[b.id] = String(b.amount);
+      });
+      return next;
+    });
+  }, [recurringBills]);
 
   // ── Import tab state
   const [importRows, setImportRows] = useState([]);
