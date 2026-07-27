@@ -161,6 +161,39 @@ function parseStatementCSV(text) {
   return { rows };
 }
 
+// ── BillCard: top-level so React never remounts on parent re-render ───────────
+function BillCard({ bill, isOverdue, billAmounts, setBillAmounts, payRecurringBill, saving, nbdCreditAccount }) {
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${isOverdue ? 'border-red-800 bg-red-950/20' : 'border-neutral-700 bg-neutral-800'}`}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div>
+          <p className="text-sm text-white font-medium">{bill.name}</p>
+          <p className="text-xs text-gray-500">
+            {bill.category}
+            {nbdCreditAccount ? ` · ${nbdCreditAccount.name}` : ''}
+            {bill.dueDay != null ? ` · Due: ${ordinal(parseInt(bill.dueDay))}` : ''}
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2 items-center">
+        <input type="number"
+          value={billAmounts[bill.id] ?? ''}
+          onChange={e => setBillAmounts(prev => ({ ...prev, [bill.id]: e.target.value }))}
+          className="w-28 bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white text-sm font-mono" />
+        <span className="text-xs text-gray-500">{bill.currency || 'AED'}</span>
+        <button onClick={() => payRecurringBill(bill, true)} disabled={saving}
+          className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold disabled:opacity-40 transition">
+          + Add Another
+        </button>
+        <button onClick={() => payRecurringBill(bill, false)} disabled={saving}
+          className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold disabled:opacity-40 transition">
+          ✓ Pay Now
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function AddTransactionModal({ accounts, transactions = [], recurringBills = [], onClose, initialTab = 'manual' }) {
   const now = new Date();
@@ -224,13 +257,17 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const toCurrency   = toAcct?.currency   || fromCurrency;
   const isCrossCurrency = type === 'transfer' && !!toAcct && fromCurrency !== toCurrency;
 
-  // Paid-this-month detection: match by description OR by 'Recurring bill' note
-  const thisMonthDescs = transactions
-    .filter(tx => { const d = new Date(tx.date); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); })
-    .map(tx => (tx.description || '').toLowerCase().trim());
+  // Paid-this-month detection: check by recurringBillId (reliable) or description fallback
+  const thisMonthTx = transactions.filter(tx => {
+    const d = new Date(tx.date);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && tx.type === 'expense';
+  });
+  const thisMonthDescs = thisMonthTx.map(tx => (tx.description || '').toLowerCase().trim());
+  const thisMonthBillIds = new Set(thisMonthTx.map(tx => tx.recurringBillId).filter(Boolean));
 
-  function isBillPaid(billName) {
-    const name = billName.toLowerCase().trim();
+  function isBillPaid(bill) {
+    if (thisMonthBillIds.has(bill.id)) return true;
+    const name = (bill.name || '').toLowerCase().trim();
     return thisMonthDescs.some(desc => desc === name || desc.includes(name) || name.includes(desc));
   }
 
@@ -302,6 +339,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
         fromAccount: acct?.id || null,
         toAccount: null,
         notes: 'Recurring bill',
+        recurringBillId: bill.id,
         reconciled: !isCreditCard,
       });
       if (acct) {
@@ -562,57 +600,35 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
             {recurringBills.length === 0 ? (
               <p className="text-gray-500 text-sm text-center py-6">No recurring bills configured</p>
             ) : (() => {
-              const overdue  = recurringBills.filter(b => b.dueDay != null && parseInt(b.dueDay) <= todayDay);
-              const upcoming = recurringBills.filter(b => b.dueDay == null || parseInt(b.dueDay) > todayDay);
-
-              function BillRow({ bill }) {
-                const isPaid = isBillPaid(bill.name);
-                return (
-                  <div className={`rounded-xl border px-4 py-3 ${isPaid ? 'border-neutral-700 opacity-50' : 'border-neutral-700 bg-neutral-800'}`}>
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div>
-                        <p className="text-sm text-white font-medium">{bill.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {bill.category}
-                          {nbdCreditAccount ? ` · ${nbdCreditAccount.name}` : ''}
-                          {bill.dueDay != null ? ` · Due: ${ordinal(parseInt(bill.dueDay))}` : ''}
-                        </p>
-                      </div>
-                      {isPaid && <span className="text-xs text-emerald-500 font-semibold shrink-0">✓ Paid</span>}
-                    </div>
-                    {!isPaid && (
-                      <div className="flex gap-2 items-center">
-                        <input type="number"
-                          value={billAmounts[bill.id] ?? ''}
-                          onChange={e => setBillAmounts(prev => ({ ...prev, [bill.id]: e.target.value }))}
-                          className="w-28 bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white text-sm font-mono" />
-                        <span className="text-xs text-gray-500">{bill.currency || 'AED'}</span>
-                        <button onClick={() => payRecurringBill(bill, true)} disabled={saving}
-                          className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold disabled:opacity-40 transition">
-                          + Add Another
-                        </button>
-                        <button onClick={() => payRecurringBill(bill, false)} disabled={saving}
-                          className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold disabled:opacity-40 transition">
-                          ✓ Pay Now
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              }
+              const paid     = recurringBills.filter(b => isBillPaid(b));
+              const paidIds  = new Set(paid.map(b => b.id));
+              const unpaid   = recurringBills.filter(b => !paidIds.has(b.id));
+              const overdue  = unpaid.filter(b => b.dueDay != null && parseInt(b.dueDay) <= todayDay);
+              const upcoming = unpaid.filter(b => b.dueDay == null || parseInt(b.dueDay) > todayDay);
 
               return (
                 <>
                   {overdue.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs font-bold text-red-400 uppercase tracking-wide">⚠ Overdue</p>
-                      {overdue.map(b => <BillRow key={b.id} bill={b} />)}
+                      {overdue.map(b => <BillCard key={b.id} bill={b} isOverdue={true} billAmounts={billAmounts} setBillAmounts={setBillAmounts} payRecurringBill={payRecurringBill} saving={saving} nbdCreditAccount={nbdCreditAccount} />)}
                     </div>
                   )}
                   {upcoming.length > 0 && (
                     <div className="space-y-2 mt-2">
                       <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Upcoming</p>
-                      {upcoming.map(b => <BillRow key={b.id} bill={b} />)}
+                      {upcoming.map(b => <BillCard key={b.id} bill={b} isOverdue={false} billAmounts={billAmounts} setBillAmounts={setBillAmounts} payRecurringBill={payRecurringBill} saving={saving} nbdCreditAccount={nbdCreditAccount} />)}
+                    </div>
+                  )}
+                  {paid.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide">✓ Paid this month</p>
+                      {paid.map(b => (
+                        <div key={b.id} className="rounded-xl border border-neutral-800 px-4 py-3 opacity-40">
+                          <p className="text-sm text-white font-medium">{b.name}</p>
+                          <p className="text-xs text-gray-500">{b.category}{b.dueDay != null ? ` · Due: ${ordinal(parseInt(b.dueDay))}` : ''}</p>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </>
