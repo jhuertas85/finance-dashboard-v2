@@ -423,24 +423,29 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   }, [transactions, accounts, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange]);
 
   // ─── Recurring bills alerts ──────────────────────────────────────────────────
-  // Bills paid this month: match by description (handles both manual entry and imports)
-  const thisMonthDescs = transactions
-    .filter(tx => { const d = new Date(tx.date); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); })
-    .map(tx => (tx.description || '').toLowerCase().trim());
-  function isBillPaidThisMonth(billName) {
-    const name = billName.toLowerCase().trim();
-    return thisMonthDescs.some(d => d === name || d.includes(name) || name.includes(d));
+  const thisMonthBillTx = transactions.filter(tx => {
+    const d = new Date(tx.date);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && tx.type === 'expense';
+  });
+  const thisMonthBillIds = new Set(thisMonthBillTx.map(tx => tx.recurringBillId).filter(Boolean));
+  function isBillRegisteredThisMonth(bill) {
+    if (thisMonthBillIds.has(bill.id)) return true;
+    const name = (bill.name || '').toLowerCase().trim();
+    return thisMonthBillTx.some(tx =>
+      tx.notes === 'Recurring bill' &&
+      (tx.description || '').toLowerCase().trim() === name
+    );
   }
 
-  const recurringBillsData = recurringBills.map(bill => ({
-    ...bill,
-    isPaid: isBillPaidThisMonth(bill.name),
-    daysUntilDue: bill.dueDate
-      ? Math.ceil((new Date(bill.dueDate) - now) / 86400000)
-      : (bill.dueDay != null ? parseInt(bill.dueDay) - now.getDate() : null),
-  }));
+  const recurringBillsData = recurringBills.map(bill => {
+    const day = bill.dayOfMonth ?? bill.dueDay;
+    const daysUntilDue = day != null
+      ? parseInt(day) - now.getDate()
+      : bill.dueDate ? Math.ceil((new Date(bill.dueDate) - now) / 86400000) : null;
+    return { ...bill, isPaid: isBillRegisteredThisMonth(bill), daysUntilDue };
+  });
   const overdueBills = recurringBillsData.filter(b => !b.isPaid && b.daysUntilDue != null && b.daysUntilDue < 0);
-  const dueSoonBills = recurringBillsData.filter(b => !b.isPaid && b.daysUntilDue != null && b.daysUntilDue >= 0 && b.daysUntilDue <= 7);
+  const dueSoonBills = recurringBillsData.filter(b => !b.isPaid && b.daysUntilDue != null && b.daysUntilDue >= 0 && b.daysUntilDue <= 2);
 
   function handleMonthClick(data) {
     if (!data || data.isFuture) return;

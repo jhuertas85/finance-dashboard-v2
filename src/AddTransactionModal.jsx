@@ -162,7 +162,8 @@ function parseStatementCSV(text) {
 }
 
 function billDueLabel(bill) {
-  if (bill.dueDay != null) return `Due: ${ordinal(parseInt(bill.dueDay))}`;
+  const day = bill.dayOfMonth ?? bill.dueDay;
+  if (day != null) return `Due: ${ordinal(parseInt(day))}`;
   if (bill.dueDate) {
     const d = new Date(bill.dueDate);
     return `Due: ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
@@ -171,17 +172,30 @@ function billDueLabel(bill) {
 }
 
 // ── BillCard: top-level so React never remounts on parent re-render ───────────
-function BillCard({ bill, isOverdue, billAmounts, setBillAmounts, payRecurringBill, saving, nbdCreditAccount }) {
+function BillCard({ bill, isOverdue, isDueSoon, missingLastMonth, billAmounts, setBillAmounts, payRecurringBill, saving, nbdCreditAccount }) {
   const dueLabel = billDueLabel(bill);
+  const borderClass = isOverdue
+    ? 'border-red-800 bg-red-950/20'
+    : isDueSoon
+      ? 'border-amber-700 bg-amber-950/20'
+      : 'border-neutral-700 bg-neutral-800';
   return (
-    <div className={`rounded-xl border px-4 py-3 ${isOverdue ? 'border-red-800 bg-red-950/20' : 'border-neutral-700 bg-neutral-800'}`}>
+    <div className={`rounded-xl border px-4 py-3 ${borderClass}`}>
       <div className="flex items-start justify-between gap-3 mb-2">
         <div>
-          <p className="text-sm text-white font-medium">{bill.name}</p>
-          <p className="text-xs text-gray-500">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm text-white font-medium">{bill.name}</p>
+            {missingLastMonth && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-700">
+                ⚠ also missing last month
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">
             {bill.category}
             {nbdCreditAccount ? ` · ${nbdCreditAccount.name}` : ''}
             {dueLabel ? ` · ${dueLabel}` : ''}
+            {bill.expectedAmountAED ? ` · expected AED ${bill.expectedAmountAED}` : ''}
           </p>
         </div>
       </div>
@@ -189,7 +203,8 @@ function BillCard({ bill, isOverdue, billAmounts, setBillAmounts, payRecurringBi
         <input type="number"
           value={billAmounts[bill.id] ?? ''}
           onChange={e => setBillAmounts(prev => ({ ...prev, [bill.id]: e.target.value }))}
-          className="w-28 bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white text-sm font-mono" />
+          placeholder={bill.expectedAmountAED ? String(bill.expectedAmountAED) : '0'}
+          className="w-28 bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-1.5 text-white text-sm font-mono placeholder-gray-600" />
         <span className="text-xs text-gray-500">{bill.currency || 'AED'}</span>
         <button onClick={() => payRecurringBill(bill, true)} disabled={saving}
           className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold disabled:opacity-40 transition">
@@ -229,11 +244,13 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const [error, setError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
 
-  // ── Last known amount per bill — from Firestore bill.amount or most recent matching transaction
+  // ── Last known amount per bill — from expectedAmountAED field, then last matching transaction
   const lastKnownAmounts = useMemo(() => {
     const m = {};
     recurringBills.forEach(bill => {
-      if (bill.amount != null && bill.amount !== 0) { m[bill.id] = bill.amount; return; }
+      if (bill.expectedAmountAED != null && bill.expectedAmountAED !== 0) {
+        m[bill.id] = bill.expectedAmountAED; return;
+      }
       const match = transactions
         .filter(tx => tx.recurringBillId === bill.id || (
           tx.type === 'expense' && tx.notes === 'Recurring bill' &&
@@ -637,39 +654,75 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
             {recurringBills.length === 0 ? (
               <p className="text-gray-500 text-sm text-center py-6">No recurring bills configured</p>
             ) : (() => {
-              const paid     = recurringBills.filter(b => isBillPaid(b));
-              const paidIds  = new Set(paid.map(b => b.id));
-              const unpaid   = recurringBills.filter(b => !paidIds.has(b.id));
+              const paid    = recurringBills.filter(b => isBillPaid(b));
+              const paidIds = new Set(paid.map(b => b.id));
+              const unpaid  = recurringBills.filter(b => !paidIds.has(b.id));
 
               function daysUntilDue(bill) {
+                const day = bill.dayOfMonth ?? bill.dueDay;
+                if (day != null) return parseInt(day) - todayDay;
                 if (bill.dueDate) return Math.ceil((new Date(bill.dueDate) - now) / 86400000);
-                if (bill.dueDay != null) return parseInt(bill.dueDay) - todayDay;
                 return null;
               }
+
+              // Check last-month payments (for missed-last-month badge)
+              const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+              const lastMonthTx = transactions.filter(tx => {
+                const d = new Date(tx.date);
+                return d.getFullYear() === lastMonthDate.getFullYear() &&
+                  d.getMonth() === lastMonthDate.getMonth() && tx.type === 'expense';
+              });
+              const lastMonthBillIds = new Set(lastMonthTx.map(tx => tx.recurringBillId).filter(Boolean));
+              function wasPaidLastMonth(bill) {
+                if (lastMonthBillIds.has(bill.id)) return true;
+                const name = (bill.name || '').toLowerCase().trim();
+                return lastMonthTx.some(tx =>
+                  tx.notes === 'Recurring bill' &&
+                  (tx.description || '').toLowerCase().trim() === name
+                );
+              }
+
               const overdue  = unpaid.filter(b => { const d = daysUntilDue(b); return d != null && d < 0; });
-              const upcoming = unpaid.filter(b => { const d = daysUntilDue(b); return d == null || d >= 0; });
+              const dueSoon  = unpaid.filter(b => { const d = daysUntilDue(b); return d != null && d >= 0 && d <= 2; });
+              const upcoming = unpaid.filter(b => { const d = daysUntilDue(b); return d == null || d > 2; });
+
+              const cardProps = (b, extra = {}) => ({
+                key: b.id, bill: b,
+                billAmounts, setBillAmounts, payRecurringBill, saving, nbdCreditAccount,
+                missingLastMonth: !wasPaidLastMonth(b),
+                ...extra,
+              });
 
               return (
                 <>
                   {overdue.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-xs font-bold text-red-400 uppercase tracking-wide">⚠ Overdue</p>
-                      {overdue.map(b => <BillCard key={b.id} bill={b} isOverdue={true} billAmounts={billAmounts} setBillAmounts={setBillAmounts} payRecurringBill={payRecurringBill} saving={saving} nbdCreditAccount={nbdCreditAccount} />)}
+                      <p className="text-xs font-bold text-red-400 uppercase tracking-wide">⚠ Overdue — register payment</p>
+                      {overdue.map(b => <BillCard {...cardProps(b, { isOverdue: true, isDueSoon: false })} />)}
+                    </div>
+                  )}
+                  {dueSoon.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      <p className="text-xs font-bold text-amber-400 uppercase tracking-wide">⏰ Due in 1–2 days</p>
+                      {dueSoon.map(b => <BillCard {...cardProps(b, { isOverdue: false, isDueSoon: true })} />)}
                     </div>
                   )}
                   {upcoming.length > 0 && (
                     <div className="space-y-2 mt-2">
                       <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Upcoming</p>
-                      {upcoming.map(b => <BillCard key={b.id} bill={b} isOverdue={false} billAmounts={billAmounts} setBillAmounts={setBillAmounts} payRecurringBill={payRecurringBill} saving={saving} nbdCreditAccount={nbdCreditAccount} />)}
+                      {upcoming.map(b => <BillCard {...cardProps(b, { isOverdue: false, isDueSoon: false })} />)}
                     </div>
                   )}
                   {paid.length > 0 && (
                     <div className="space-y-2 mt-2">
-                      <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide">✓ Paid this month</p>
+                      <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide">✓ Registered this month</p>
                       {paid.map(b => (
                         <div key={b.id} className="rounded-xl border border-neutral-800 px-4 py-3 opacity-40">
                           <p className="text-sm text-white font-medium">{b.name}</p>
-                          <p className="text-xs text-gray-500">{b.category}{b.dueDay != null ? ` · Due: ${ordinal(parseInt(b.dueDay))}` : ''}</p>
+                          <p className="text-xs text-gray-500">
+                            {b.category}
+                            {billDueLabel(b) ? ` · ${billDueLabel(b)}` : ''}
+                          </p>
                         </div>
                       ))}
                     </div>
