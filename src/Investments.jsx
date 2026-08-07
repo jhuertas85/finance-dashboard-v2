@@ -44,7 +44,6 @@ const SEED = {
     { id: 'meta', ticker: 'META', name: 'Meta Platforms', platform: 'WIO', type: 'STK', shares: 4.93349486, price: 563.85, costPerShare: 593.78, currency: 'USD', addLevels: [{ price: 530, amount: '$500' }, { price: 490, amount: '$500' }], trimLevels: [{ price: 750, action: 'trim 1.5 sh' }], status: 'ACCUMULATE', notes: 'Post-earnings -9% to ~$533 · EPS miss mostly one-time ($3.6B charges) · FCF $784M vs $8.55B yr ago · rev +28% · buy half $530, more $490' },
     { id: 'amzn', ticker: 'AMZN', name: 'Amazon', platform: 'WIO', type: 'STK', shares: 9.89225353, price: 232.79, costPerShare: 208.12, currency: 'USD', addLevels: [{ price: 230, amount: '$800' }], trimLevels: [{ price: 290, action: 'trim 3 sh' }], status: 'HOLD', notes: 'Q2 BLOWOUT: AWS +37%, rev $200.6B (+20%) · stock +12% to ~$260 today · Anthropic stake gain $53B · trim at $290 now 11% away' },
     { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 93.01, costPerShare: 102.81, currency: 'USD', addLevels: [{ price: 95, amount: '$800' }, { price: 85, amount: '$1,000' }], trimLevels: [{ price: 140, action: 'trim 3 sh' }], status: 'ACCUMULATE', notes: 'Q2 beat · at ~$107 · consensus $140-147 · JPMorgan $150, Cantor $120 · AI ACV $1.5B run rate · add dips to $95' },
-    { id: 'cake', ticker: 'CAKE', name: 'Cheesecake Factory', platform: 'WIO', type: 'STK', shares: 11, price: 76.91, costPerShare: 48.50, currency: 'USD', addLevels: [{ price: 63, amount: '$800' }], trimLevels: [{ price: 95, action: 'SELL ALL — above Oppenheimer $91 ceiling' }], status: 'TRIM', notes: 'ATH $101 post-earnings (+12%) · Mizuho DOWNGRADED to Neutral · max analyst target Oppenheimer $91 · SELL ALL NOW · re-add only at $63' },
     { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 795.24, costPerShare: 809.73, currency: 'USD', addLevels: [], trimLevels: [], status: 'ACCUMULATE', notes: 'S&P base · market ripping Jul 31 (AMZN +12%) · keep accumulating on −5% dips · never trim' },
     { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.07539626, price: 69.10, costPerShare: 161.14, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', notes: 'At $74 still below $77 resistance · on-chain near ATH · flip $77→$90-125 · cost $161 · DCA only at $50/$40' },
     // WIO — managed products
@@ -59,6 +58,7 @@ const SEED = {
     { id: 'sol-binance', ticker: 'SOL', name: 'Solana (Binance)', platform: 'Binance', type: 'CRY', shares: 40.1310624738, price: 69.13, costPerShare: 159.46, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', notes: 'At $74 still below $77 resistance · on-chain near ATH · flip $77→$90-125 · cost $159 · DCA only at $50/$40' },
   ],
   closedPositions: [
+    { id: 'cake-c', closedFromActiveId: 'cake', ticker: 'CAKE', platform: 'WIO', type: 'STK', closedDate: '31 Jul 26', qty: 11, sellPrice: '$101.62', costAED: 534, proceeds: 1118, gainLoss: 584, pct: 109.5 },
     { id: 'smci-c', ticker: 'SMCI', platform: 'WIO', type: 'STK', closedDate: '14 May 26', qty: 10, sellPrice: '$32.08', costAED: 568, proceeds: 321, gainLoss: -247, pct: -43.5 },
     { id: 'sofi-c', ticker: 'SOFI', platform: 'WIO', type: 'STK', closedDate: 'Jun 26', qty: 18, sellPrice: '$17.21', costAED: 514, proceeds: 310, gainLoss: -204, pct: -39.7 },
     { id: 'dher-c2', ticker: 'DHER', platform: 'Talabat/DH', type: 'STK', closedDate: 'Jun 26', qty: 685, sellPrice: '€36.88', costAED: 0, proceeds: 29602, gainLoss: 29602, pct: null },
@@ -84,14 +84,27 @@ const SEED = {
 // Analysis fields driven by code — merged over Firestore on every load
 const ANALYSIS_FIELDS = ['status', 'addLevels', 'trimLevels', 'notes'];
 function mergeAnalysis(firestoreData) {
-  const positions = (firestoreData.positions || []).map(fsPos => {
-    const seed = SEED.positions.find(s => s.id === fsPos.id);
-    if (!seed) return fsPos;
-    const overrides = {};
-    ANALYSIS_FIELDS.forEach(f => { overrides[f] = seed[f]; });
-    return { ...fsPos, ...overrides };
-  });
-  return { ...firestoreData, positions, config: { ...firestoreData.config, analysisDate: SEED.config.analysisDate } };
+  // Active positions that have been closed via SEED (closedFromActiveId links closed → active id)
+  const seedClosedActiveIds = new Set(
+    SEED.closedPositions.map(p => p.closedFromActiveId).filter(Boolean)
+  );
+
+  const positions = (firestoreData.positions || [])
+    .filter(fsPos => !seedClosedActiveIds.has(fsPos.id))
+    .map(fsPos => {
+      const seed = SEED.positions.find(s => s.id === fsPos.id);
+      if (!seed) return fsPos;
+      const overrides = {};
+      ANALYSIS_FIELDS.forEach(f => { overrides[f] = seed[f]; });
+      return { ...fsPos, ...overrides };
+    });
+
+  // Prepend SEED-driven closed positions not already stored in Firestore
+  const firestoreClosedIds = new Set((firestoreData.closedPositions || []).map(p => p.id));
+  const seedClosedToAdd = SEED.closedPositions.filter(p => !firestoreClosedIds.has(p.id));
+  const closedPositions = [...seedClosedToAdd, ...(firestoreData.closedPositions || [])];
+
+  return { ...firestoreData, positions, closedPositions, config: { ...firestoreData.config, analysisDate: SEED.config.analysisDate } };
 }
 
 // ─── CoinGecko IDs ────────────────────────────────────────────────────────────
