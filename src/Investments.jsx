@@ -187,34 +187,37 @@ function TriggerRail({ price, addLevels, trimLevels, status, currency, type }) {
   );
 }
 
-// ─── Edit modal ───────────────────────────────────────────────────────────────
-function EditPositionModal({ pos, onSave, onClose, onDelete }) {
+// ─── Edit / Buy / Sell modal ──────────────────────────────────────────────────
+function EditPositionModal({ pos, onSave, onClose, onDelete, onBuy, onSell }) {
+  const isNew = !pos;
+  const [mode, setMode] = useState('edit');
+
+  // Edit form
   const [form, setForm] = useState({
-    ticker: pos?.ticker || '',
-    name: pos?.name || '',
-    platform: pos?.platform || 'WIO',
-    type: pos?.type || 'STK',
-    shares: String(pos?.shares || ''),
-    price: String(pos?.price || ''),
-    costPerShare: String(pos?.costPerShare || ''),
-    currency: pos?.currency || 'USD',
-    status: pos?.status || 'HOLD',
-    notes: pos?.notes || '',
-    addLevel1: String(pos?.addLevels?.[0]?.price || ''),
-    addAmount1: pos?.addLevels?.[0]?.amount || '',
-    addLevel2: String(pos?.addLevels?.[1]?.price || ''),
-    addAmount2: pos?.addLevels?.[1]?.amount || '',
-    trimLevel1: String(pos?.trimLevels?.[0]?.price || ''),
-    trimAction1: pos?.trimLevels?.[0]?.action || '',
-    trimLevel2: String(pos?.trimLevels?.[1]?.price || ''),
-    trimAction2: pos?.trimLevels?.[1]?.action || '',
+    ticker: pos?.ticker || '', name: pos?.name || '', platform: pos?.platform || 'WIO',
+    type: pos?.type || 'STK', shares: String(pos?.shares || ''), price: String(pos?.price || ''),
+    costPerShare: String(pos?.costPerShare || ''), currency: pos?.currency || 'USD',
+    status: pos?.status || 'HOLD', notes: pos?.notes || '',
+    addLevel1: String(pos?.addLevels?.[0]?.price || ''), addAmount1: pos?.addLevels?.[0]?.amount || '',
+    addLevel2: String(pos?.addLevels?.[1]?.price || ''), addAmount2: pos?.addLevels?.[1]?.amount || '',
+    trimLevel1: String(pos?.trimLevels?.[0]?.price || ''), trimAction1: pos?.trimLevels?.[0]?.action || '',
+    trimLevel2: String(pos?.trimLevels?.[1]?.price || ''), trimAction2: pos?.trimLevels?.[1]?.action || '',
   });
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  // Buy More state
+  const [buyQty, setBuyQty] = useState('');
+  const [buyPrice, setBuyPrice] = useState('');
+
+  // Sell state
+  const [sellQty, setSellQty] = useState('');
+  const [sellProceeds, setSellProceeds] = useState('');
+
   const inp = 'w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:border-emerald-600 outline-none';
   const lbl = 'text-[10px] text-gray-500 uppercase font-bold block mb-1';
-  const isNew = !pos;
+  const sym = pos?.currency === 'EUR' ? '€' : pos?.currency === 'AED' ? 'AED ' : '$';
 
-  function handleSave() {
+  function handleEditSave() {
     const addLevels = [];
     if (form.addLevel1) addLevels.push({ price: +form.addLevel1, amount: form.addAmount1 });
     if (form.addLevel2) addLevels.push({ price: +form.addLevel2, amount: form.addAmount2 });
@@ -224,71 +227,194 @@ function EditPositionModal({ pos, onSave, onClose, onDelete }) {
     onSave({ ...pos, id: pos?.id || Date.now().toString(), ticker: form.ticker.toUpperCase(), name: form.name, platform: form.platform, type: form.type, shares: +form.shares, price: +form.price, costPerShare: +form.costPerShare, currency: form.currency, status: form.status, notes: form.notes, addLevels, trimLevels });
   }
 
+  // Buy preview calculations
+  const bQty = +buyQty, bPrice = +buyPrice;
+  const buyNewTotal = pos && bQty > 0 ? pos.shares + bQty : null;
+  const buyNewAvgCost = buyNewTotal ? (pos.shares * pos.costPerShare + bQty * bPrice) / buyNewTotal : null;
+
+  // Sell preview calculations
+  const sQty = +sellQty, sProceeds = +sellProceeds;
+  const sellRemaining = pos && sQty > 0 ? pos.shares - sQty : null;
+  const sellCostBasis = pos && sQty > 0 ? sQty * pos.costPerShare : 0;
+  const sellGainLoss = sQty > 0 && sProceeds > 0 ? sProceeds - sellCostBasis : null;
+  const sellPct = sellCostBasis > 0 && sellGainLoss !== null ? (sellGainLoss / sellCostBasis * 100) : null;
+  const isFullExit = sellRemaining !== null && sellRemaining <= 0.000001;
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-start justify-center z-50 p-4 pt-10 overflow-y-auto">
       <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-5 w-full max-w-lg space-y-3">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-white font-bold text-sm">{isNew ? 'Add Position' : `Edit — ${pos.ticker}`}</h3>
+          <h3 className="text-white font-bold text-sm">{isNew ? 'Add Position' : pos.ticker}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className={lbl}>Ticker</label><input className={inp} value={form.ticker} onChange={e => f('ticker', e.target.value)} placeholder="AMD" /></div>
-          <div><label className={lbl}>Name</label><input className={inp} value={form.name} onChange={e => f('name', e.target.value)} /></div>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div><label className={lbl}>Platform</label>
-            <select className={inp} value={form.platform} onChange={e => f('platform', e.target.value)}>
-              {['WIO', 'Binance', 'DH/Talabat'].map(p => <option key={p}>{p}</option>)}
-            </select>
+        {/* Mode tabs — only for existing positions */}
+        {!isNew && (
+          <div className="flex border-b border-neutral-800 -mx-5 px-5 mb-1">
+            {[['edit', 'Edit'], ['buy', 'Buy More'], ['sell', 'Sell']].map(([id, label]) => (
+              <button key={id} onClick={() => setMode(id)}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition ${
+                  mode === id
+                    ? id === 'sell' ? 'border-red-500 text-red-400' : 'border-emerald-500 text-emerald-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                }`}>{label}</button>
+            ))}
           </div>
-          <div><label className={lbl}>Type</label>
-            <select className={inp} value={form.type} onChange={e => f('type', e.target.value)}>
-              {['STK', 'CRY', 'ETF', 'WLT'].map(t => <option key={t}>{t}</option>)}
-            </select>
-          </div>
-          <div><label className={lbl}>Currency</label>
-            <select className={inp} value={form.currency} onChange={e => f('currency', e.target.value)}>
-              {['USD', 'EUR', 'AED'].map(c => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div><label className={lbl}>Shares / Units</label><input className={inp} type="number" value={form.shares} onChange={e => f('shares', e.target.value)} /></div>
-          <div><label className={lbl}>Current Price</label><input className={inp} type="number" value={form.price} onChange={e => f('price', e.target.value)} /></div>
-          <div><label className={lbl}>Cost / Share</label><input className={inp} type="number" value={form.costPerShare} onChange={e => f('costPerShare', e.target.value)} /></div>
-        </div>
+        )}
 
-        <div className="border-t border-neutral-800 pt-3">
-          <div className="text-[10px] text-gray-500 uppercase font-bold mb-2">Add Levels</div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex gap-1"><input className={inp} type="number" placeholder="Price" value={form.addLevel1} onChange={e => f('addLevel1', e.target.value)} /><input className={`${inp} flex-1`} placeholder="$1,000" value={form.addAmount1} onChange={e => f('addAmount1', e.target.value)} /></div>
-            <div className="flex gap-1"><input className={inp} type="number" placeholder="Price" value={form.addLevel2} onChange={e => f('addLevel2', e.target.value)} /><input className={`${inp} flex-1`} placeholder="$1,500" value={form.addAmount2} onChange={e => f('addAmount2', e.target.value)} /></div>
+        {/* ── Edit mode ── */}
+        {(isNew || mode === 'edit') && (<>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lbl}>Ticker</label><input className={inp} value={form.ticker} onChange={e => f('ticker', e.target.value)} placeholder="AMD" /></div>
+            <div><label className={lbl}>Name</label><input className={inp} value={form.name} onChange={e => f('name', e.target.value)} /></div>
           </div>
-        </div>
-
-        <div>
-          <div className="text-[10px] text-gray-500 uppercase font-bold mb-2">Trim Levels</div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex gap-1"><input className={inp} type="number" placeholder="Price" value={form.trimLevel1} onChange={e => f('trimLevel1', e.target.value)} /><input className={`${inp} flex-1`} placeholder="trim 3 sh" value={form.trimAction1} onChange={e => f('trimAction1', e.target.value)} /></div>
-            <div className="flex gap-1"><input className={inp} type="number" placeholder="Price" value={form.trimLevel2} onChange={e => f('trimLevel2', e.target.value)} /><input className={`${inp} flex-1`} placeholder="trim 3 sh" value={form.trimAction2} onChange={e => f('trimAction2', e.target.value)} /></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={lbl}>Platform</label>
+              <select className={inp} value={form.platform} onChange={e => f('platform', e.target.value)}>
+                {['WIO', 'Binance', 'DH/Talabat'].map(p => <option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Type</label>
+              <select className={inp} value={form.type} onChange={e => f('type', e.target.value)}>
+                {['STK', 'CRY', 'ETF', 'WLT'].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Currency</label>
+              <select className={inp} value={form.currency} onChange={e => f('currency', e.target.value)}>
+                {['USD', 'EUR', 'AED'].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className={lbl}>Status</label>
-            <select className={inp} value={form.status} onChange={e => f('status', e.target.value)}>
-              {['HOLD', 'ACCUMULATE', 'WATCH', 'TRIM'].map(s => <option key={s}>{s}</option>)}
-            </select>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={lbl}>Shares / Units</label><input className={inp} type="number" value={form.shares} onChange={e => f('shares', e.target.value)} /></div>
+            <div><label className={lbl}>Current Price</label><input className={inp} type="number" value={form.price} onChange={e => f('price', e.target.value)} /></div>
+            <div><label className={lbl}>Cost / Share</label><input className={inp} type="number" value={form.costPerShare} onChange={e => f('costPerShare', e.target.value)} /></div>
           </div>
-          <div><label className={lbl}>Notes</label><input className={inp} value={form.notes} onChange={e => f('notes', e.target.value)} /></div>
-        </div>
+          <div className="border-t border-neutral-800 pt-3">
+            <div className="text-[10px] text-gray-500 uppercase font-bold mb-2">Add Levels</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex gap-1"><input className={inp} type="number" placeholder="Price" value={form.addLevel1} onChange={e => f('addLevel1', e.target.value)} /><input className={`${inp} flex-1`} placeholder="$1,000" value={form.addAmount1} onChange={e => f('addAmount1', e.target.value)} /></div>
+              <div className="flex gap-1"><input className={inp} type="number" placeholder="Price" value={form.addLevel2} onChange={e => f('addLevel2', e.target.value)} /><input className={`${inp} flex-1`} placeholder="$1,500" value={form.addAmount2} onChange={e => f('addAmount2', e.target.value)} /></div>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-500 uppercase font-bold mb-2">Trim Levels</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex gap-1"><input className={inp} type="number" placeholder="Price" value={form.trimLevel1} onChange={e => f('trimLevel1', e.target.value)} /><input className={`${inp} flex-1`} placeholder="trim 3 sh" value={form.trimAction1} onChange={e => f('trimAction1', e.target.value)} /></div>
+              <div className="flex gap-1"><input className={inp} type="number" placeholder="Price" value={form.trimLevel2} onChange={e => f('trimLevel2', e.target.value)} /><input className={`${inp} flex-1`} placeholder="trim 3 sh" value={form.trimAction2} onChange={e => f('trimAction2', e.target.value)} /></div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lbl}>Status</label>
+              <select className={inp} value={form.status} onChange={e => f('status', e.target.value)}>
+                {['HOLD', 'ACCUMULATE', 'WATCH', 'TRIM'].map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div><label className={lbl}>Notes</label><input className={inp} value={form.notes} onChange={e => f('notes', e.target.value)} /></div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            {!isNew && <button onClick={() => onDelete(pos.id)} className="px-3 py-2 border border-red-800 text-red-400 rounded-xl text-xs hover:bg-red-900/30 transition">🗑 Remove</button>}
+            <button onClick={onClose} className="flex-1 py-2 border border-neutral-700 text-gray-400 rounded-xl text-xs hover:text-white transition">Cancel</button>
+            <button onClick={handleEditSave} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition">✓ Save</button>
+          </div>
+        </>)}
 
-        <div className="flex gap-2 pt-2">
-          {!isNew && <button onClick={() => onDelete(pos.id)} className="px-3 py-2 border border-red-800 text-red-400 rounded-xl text-xs hover:bg-red-900/30 transition">🗑 Remove</button>}
-          <button onClick={onClose} className="flex-1 py-2 border border-neutral-700 text-gray-400 rounded-xl text-xs hover:text-white transition">Cancel</button>
-          <button onClick={handleSave} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition">✓ Save</button>
-        </div>
+        {/* ── Buy More mode ── */}
+        {!isNew && mode === 'buy' && (
+          <div className="space-y-3 pt-1">
+            <div className="text-[11px] text-gray-500">
+              Current: <span className="text-gray-300 font-mono">{fmtShares(pos.shares)} shares @ {fmtPrice(pos.costPerShare, pos.currency)} avg</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={lbl}>Shares / Units Bought</label>
+                <input className={inp} type="number" min="0" value={buyQty} onChange={e => setBuyQty(e.target.value)} placeholder="0" autoFocus />
+              </div>
+              <div>
+                <label className={lbl}>Price Per Share</label>
+                <input className={inp} type="number" min="0" value={buyPrice} onChange={e => setBuyPrice(e.target.value)} placeholder={sym + '0.00'} />
+              </div>
+            </div>
+            {buyNewTotal !== null && bPrice > 0 && (
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-2">
+                <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Result</div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Adding</span>
+                  <span className="text-blue-300 font-mono">+{fmtShares(bQty)} @ {fmtPrice(bPrice, pos.currency)}</span>
+                </div>
+                <div className="border-t border-neutral-800 pt-2 flex justify-between text-xs">
+                  <span className="text-gray-300 font-semibold">New total shares</span>
+                  <span className="text-white font-mono font-bold">{fmtShares(buyNewTotal)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-300 font-semibold">New avg cost</span>
+                  <span className="text-white font-mono font-bold">{fmtPrice(buyNewAvgCost, pos.currency)}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button onClick={onClose} className="flex-1 py-2 border border-neutral-700 text-gray-400 rounded-xl text-xs hover:text-white transition">Cancel</button>
+              <button onClick={() => onBuy(bQty, bPrice)} disabled={!bQty || !bPrice}
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition">
+                + Add {buyQty || '?'} shares
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Sell mode ── */}
+        {!isNew && mode === 'sell' && (
+          <div className="space-y-3 pt-1">
+            <div className="text-[11px] text-gray-500">
+              Holding: <span className="text-gray-300 font-mono">{fmtShares(pos.shares)} shares @ {fmtPrice(pos.costPerShare, pos.currency)} cost</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={lbl}>Shares / Units Sold</label>
+                <input className={inp} type="number" min="0" value={sellQty} onChange={e => setSellQty(e.target.value)} placeholder={fmtShares(pos.shares)} autoFocus />
+              </div>
+              <div>
+                <label className={lbl}>Total Proceeds ({pos.currency})</label>
+                <input className={inp} type="number" min="0" value={sellProceeds} onChange={e => setSellProceeds(e.target.value)} placeholder={sym + '0.00'} />
+              </div>
+            </div>
+            {sQty > 0 && sProceeds > 0 && (
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-2">
+                <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Result</div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Sell price / share</span>
+                  <span className="text-gray-300 font-mono">{fmtPrice(sProceeds / sQty, pos.currency)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Cost basis sold</span>
+                  <span className="text-gray-400 font-mono">{fmtPrice(pos.costPerShare, pos.currency)} × {fmtShares(sQty)} = {sym}{sellCostBasis.toFixed(2)}</span>
+                </div>
+                <div className="border-t border-neutral-800 pt-2 flex justify-between text-xs">
+                  <span className="text-gray-300 font-semibold">Remaining shares</span>
+                  <span className={`font-mono font-bold ${isFullExit ? 'text-red-400' : 'text-white'}`}>
+                    {isFullExit ? 'FULL EXIT — position closed' : fmtShares(sellRemaining)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-300 font-semibold">Realized gain / loss</span>
+                  <span className={`font-mono font-bold ${sellGainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {sellGainLoss >= 0 ? '+' : '-'}{fmtUSD(sellGainLoss)}
+                    {sellPct !== null && <span className="text-[10px] ml-1 opacity-80">({sellPct >= 0 ? '+' : ''}{sellPct.toFixed(1)}%)</span>}
+                  </span>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button onClick={onClose} className="flex-1 py-2 border border-neutral-700 text-gray-400 rounded-xl text-xs hover:text-white transition">Cancel</button>
+              <button onClick={() => onSell(sQty, sProceeds)} disabled={!sQty || !sProceeds}
+                className={`flex-1 py-2 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition ${
+                  isFullExit ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'
+                }`}>
+                {isFullExit ? 'Close Position' : `Sell ${sellQty || '?'} shares`}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -442,6 +568,48 @@ export default function Investments({ accounts = [] }) {
   function deletePosition(id) {
     const positions = data.positions.filter(p => p.id !== id);
     persist({ ...data, positions }).then(() => syncToAccounts(positions));
+    setEditingPos(null);
+  }
+
+  function buyMorePosition(pos, addedShares, pricePerShare) {
+    const newShares = pos.shares + addedShares;
+    const newCostPerShare = (pos.shares * pos.costPerShare + addedShares * pricePerShare) / newShares;
+    const updated = { ...pos, shares: newShares, costPerShare: +newCostPerShare.toFixed(8) };
+    const positions = data.positions.map(p => p.id === pos.id ? updated : p);
+    persist({ ...data, positions }).then(() => syncToAccounts(positions));
+    setEditingPos(null);
+  }
+
+  function sellPosition(pos, soldShares, proceeds) {
+    const remaining = pos.shares - soldShares;
+    const costBasis = soldShares * pos.costPerShare;
+    const gainLoss = Math.round(proceeds - costBasis);
+    const pct = costBasis > 0 ? +((gainLoss / costBasis) * 100).toFixed(1) : null;
+    const d = new Date();
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const closedDate = `${d.getDate()} ${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+    const sym = pos.currency === 'EUR' ? '€' : pos.currency === 'AED' ? 'AED ' : '$';
+
+    const closeEntry = {
+      id: `${pos.id}-c-${Date.now()}`,
+      ticker: pos.ticker,
+      platform: pos.platform,
+      type: pos.type,
+      closedDate,
+      qty: soldShares,
+      sellPrice: sym + (soldShares > 0 ? (proceeds / soldShares).toFixed(2) : '0'),
+      costAED: Math.round(costBasis),
+      proceeds: Math.round(proceeds),
+      gainLoss,
+      pct,
+    };
+
+    const closedPositions = [closeEntry, ...(data.closedPositions || [])];
+    const positions = remaining <= 0.000001
+      ? data.positions.filter(p => p.id !== pos.id)
+      : data.positions.map(p => p.id === pos.id ? { ...p, shares: remaining } : p);
+
+    persist({ ...data, positions, closedPositions }).then(() => syncToAccounts(positions));
     setEditingPos(null);
   }
 
@@ -816,6 +984,8 @@ export default function Investments({ accounts = [] }) {
           onSave={savePosition}
           onClose={() => { setEditingPos(null); setAddingPos(false); }}
           onDelete={deletePosition}
+          onBuy={(qty, price) => buyMorePosition(editingPos, qty, price)}
+          onSell={(qty, proceeds) => sellPosition(editingPos, qty, proceeds)}
         />
       )}
     </div>
