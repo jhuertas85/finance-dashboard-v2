@@ -156,13 +156,13 @@ export default function App() {
             </span>
 
             {/* Currency pills + FX refresh */}
-            <div className="flex items-center gap-1.5">
-              <div className={`flex items-center gap-1 rounded-xl p-1 ${darkMode ? 'bg-neutral-900' : 'bg-gray-200'}`}>
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <div className={`flex items-center gap-0.5 sm:gap-1 rounded-xl p-1 ${darkMode ? 'bg-neutral-900' : 'bg-gray-200'}`}>
                 {CURRENCIES.map(cur => (
                   <button
                     key={cur}
                     onClick={() => setSelectedCurrency(cur)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    className={`px-1.5 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-bold transition ${
                       selectedCurrency === cur
                         ? 'bg-emerald-500 text-white shadow'
                         : darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
@@ -188,38 +188,42 @@ export default function App() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setShowAddTx(true)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition"
-              >➕ Add Transaction</button>
+                className="flex items-center gap-1 px-2 sm:px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition"
+              >
+                <span>➕</span>
+                <span className="hidden sm:inline">Add Tx</span>
+              </button>
 
               <button
                 onClick={() => setShowReconcile(true)}
-                className={`px-3 py-2 text-xs font-semibold rounded-lg border transition ${darkMode ? 'border-neutral-700 text-gray-300 hover:text-white hover:border-neutral-500' : 'border-gray-300 text-gray-600 hover:text-gray-900'}`}
-              >⚖️ Reconcile</button>
+                title="Reconcile accounts"
+                className={`px-2 sm:px-3 py-2 text-xs font-semibold rounded-lg border transition ${darkMode ? 'border-neutral-700 text-gray-300 hover:text-white hover:border-neutral-500' : 'border-gray-300 text-gray-600 hover:text-gray-900'}`}
+              >⚖️<span className="hidden sm:inline ml-1">Reconcile</span></button>
 
               <button
                 onClick={() => setDarkMode(d => !d)}
-                className={`px-2.5 py-2 rounded-lg text-sm transition ${darkMode ? 'text-gray-400 hover:text-yellow-400' : 'text-gray-500 hover:text-gray-800'}`}
+                className={`px-2 py-2 rounded-lg text-sm transition ${darkMode ? 'text-gray-400 hover:text-yellow-400' : 'text-gray-500 hover:text-gray-800'}`}
                 title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
               >{darkMode ? '🌙' : '☀️'}</button>
 
               <button
                 onClick={handleRefresh}
-                className={`px-2.5 py-2 rounded-lg text-sm transition ${refreshing ? 'text-emerald-400 animate-spin' : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`px-2 py-2 rounded-lg text-sm transition ${refreshing ? 'text-emerald-400 animate-spin' : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 title="Refresh data"
               >🔄</button>
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <div className={`flex gap-1 border-t -mx-4 -mb-px px-4 ${darkMode ? 'border-neutral-800' : 'border-gray-200'}`}>
+          <div className={`flex border-t -mx-4 -mb-px px-4 ${darkMode ? 'border-neutral-800' : 'border-gray-200'}`}>
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 text-sm font-semibold transition border-b-2 ${
+                className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition border-b-2 ${
                   activeTab === tab.id
                     ? 'border-emerald-500 text-emerald-400'
                     : darkMode

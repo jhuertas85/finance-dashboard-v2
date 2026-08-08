@@ -330,26 +330,68 @@ export default function Transactions({ transactions, accounts = [], selectedCurr
       </div>
 
       {/* KPI summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4">
-          <div className="text-xs text-gray-500 uppercase font-semibold mb-1">Income</div>
-          <div className="text-xl font-bold text-emerald-400">{fmtAED(totalIncome)}</div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs text-gray-500 uppercase font-semibold mb-1">Income</div>
+          <div className="text-base sm:text-xl font-bold text-emerald-400 truncate">{fmtAED(totalIncome)}</div>
         </div>
-        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4">
-          <div className="text-xs text-gray-500 uppercase font-semibold mb-1">Expenses</div>
-          <div className="text-xl font-bold text-red-400">{fmtAED(totalExpense)}</div>
+        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs text-gray-500 uppercase font-semibold mb-1">Expenses</div>
+          <div className="text-base sm:text-xl font-bold text-red-400 truncate">{fmtAED(totalExpense)}</div>
         </div>
-        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4">
-          <div className="text-xs text-gray-500 uppercase font-semibold mb-1">Net</div>
-          <div className={`text-xl font-bold ${totalIncome - totalExpense >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs text-gray-500 uppercase font-semibold mb-1">Net</div>
+          <div className={`text-base sm:text-xl font-bold truncate ${totalIncome - totalExpense >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {totalIncome - totalExpense >= 0 ? '+' : '−'}{fmtAED(totalIncome - totalExpense)}
           </div>
         </div>
       </div>
 
-      {/* Transactions table */}
+      {/* Transactions list */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
+
+        {/* Mobile card view (< sm) */}
+        <div className="sm:hidden divide-y divide-neutral-900">
+          {filtered.length === 0 ? (
+            <div className="py-10 text-center text-gray-600 text-sm">No transactions found</div>
+          ) : filtered.map(tx => {
+            const fromName = getAccountName(tx.fromAccount);
+            const toName = getAccountName(tx.toAccount);
+            const isRefund = tx.type === 'expense' && tx.amount < 0;
+            const accountDisplay = tx.type === 'transfer'
+              ? `${fromName || '?'} → ${toName || '?'}`
+              : tx.type === 'income' ? toName : (fromName || (isRefund ? toName : null));
+            const amtColor = tx.type === 'income' ? 'text-emerald-400' : tx.type === 'transfer' ? 'text-blue-400' : isRefund ? 'text-purple-400' : 'text-red-400';
+            const amtPrefix = tx.type === 'income' ? '+' : tx.type === 'transfer' ? '' : isRefund ? '+' : '−';
+            return (
+              <div key={tx.id} className="px-3 py-3 flex items-start justify-between gap-2 hover:bg-neutral-900/40 transition">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] text-gray-500 mb-0.5">
+                    {formatDate(tx.date)}{tx.category ? ` · ${getCategoryEmoji(tx.category)} ${tx.category}` : ''}
+                  </div>
+                  <div className="text-sm text-gray-200 truncate font-medium">{tx.description || '—'}</div>
+                  {accountDisplay && <div className="text-[11px] text-gray-500 truncate mt-0.5">{accountDisplay}</div>}
+                  {tx.notes && <div className="text-[11px] text-gray-600 truncate">{tx.notes}</div>}
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className={`text-sm font-bold font-mono ${amtColor}`}>
+                    {amtPrefix}{tx.currency} {Math.abs(Number(tx.amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  {tx.type === 'transfer' && tx.amountTo && tx.currencyTo && tx.currencyTo !== tx.currency && (
+                    <div className="text-[10px] text-blue-300">→ {tx.currencyTo} {Number(tx.amountTo).toFixed(2)}</div>
+                  )}
+                  <div className="flex gap-1 justify-end mt-1">
+                    <button onClick={() => startEdit(tx)} className="p-1 text-gray-600 hover:text-white rounded transition">✏️</button>
+                    <button onClick={() => { setDeletingTx(tx); setError(''); }} className="p-1 text-gray-600 hover:text-red-400 rounded transition">🗑️</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop table view (sm+) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-neutral-800 bg-neutral-900/50">

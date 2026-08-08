@@ -489,7 +489,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
       {/* Top KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">NET WORTH</span>
             <span className="text-lg">💎</span>
@@ -498,7 +498,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           <div className="text-xs text-emerald-400">+7.9% ({fmtS(netWorth.total * 0.079)}) vs last month</div>
         </div>
 
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">SPENT THIS MONTH</span>
             <span className="text-lg">💸</span>
@@ -524,7 +524,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           )}
         </div>
 
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase text-gray-500">ANNUAL SAVINGS TRACKER</span>
             <span className="text-lg">📅</span>
@@ -547,7 +547,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
         {/* Capital */}
-        <div className="bg-purple-950/20 border border-purple-800/50 rounded-2xl p-5 flex flex-col">
+        <div className="bg-purple-950/20 border border-purple-800/50 rounded-2xl p-3 sm:p-5 flex flex-col">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-purple-900/50 rounded-lg p-1.5">🏦</span>
             <span className="text-xs font-bold uppercase text-gray-400">Capital</span>
@@ -565,7 +565,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         </div>
 
         {/* Assets — Usable */}
-        <div className="bg-blue-950/20 border border-blue-800/50 rounded-2xl p-5 flex flex-col">
+        <div className="bg-blue-950/20 border border-blue-800/50 rounded-2xl p-3 sm:p-5 flex flex-col">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-blue-900/50 rounded-lg p-1.5">📊</span>
             <span className="text-xs font-bold uppercase text-gray-400">Assets — Usable</span>
@@ -583,7 +583,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         </div>
 
         {/* Assets — Future */}
-        <div className="bg-neutral-950 border border-neutral-700 rounded-2xl p-5 flex flex-col">
+        <div className="bg-neutral-950 border border-neutral-700 rounded-2xl p-3 sm:p-5 flex flex-col">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-neutral-800 rounded-lg p-1.5">🔒</span>
             <span className="text-xs font-bold uppercase text-gray-400">Assets — Future</span>
@@ -615,7 +615,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         </div>
 
         {/* Credit Cards */}
-        <div className="bg-red-950/10 border border-red-900/40 rounded-2xl p-5 flex flex-col">
+        <div className="bg-red-950/10 border border-red-900/40 rounded-2xl p-3 sm:p-5 flex flex-col">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-red-900/30 rounded-lg p-1.5">💳</span>
             <span className="text-xs font-bold uppercase text-gray-400">Credit Cards</span>
@@ -651,7 +651,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       </div>
 
       {/* ── Spending Detail ──────────────────────────────────────────────────── */}
-      <div ref={spendingDetailRef} className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
+      <div ref={spendingDetailRef} className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 sm:p-6">
 
         {/* Header row */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -799,11 +799,11 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       </div>
 
       {/* Monthly Flow Chart */}
-      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5 sm:mb-6">
           <h3 className="text-sm font-bold uppercase text-gray-300">Monthly Flow — 2026</h3>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-600">Click a month to drill in · future months = estimated</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-600 hidden sm:inline">Click a month to drill in · future = estimated</span>
             {editingIncomeGoal ? (
               <div className="flex items-center gap-1">
                 <span className="text-xs text-gray-500">Est. income/mo:</span>
@@ -886,13 +886,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       </div>
 
       {/* Wealth Trajectory Chart */}
-      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-5 sm:mb-6">
           <h3 className="text-sm font-bold uppercase text-gray-300">Wealth Trajectory</h3>
           <div className="flex bg-neutral-800 rounded-lg p-0.5">
             {['6M', '12M', '24M', 'YTD', 'ALL'].map(r => (
               <button key={r} onClick={() => setWealthRange(r)}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${wealthRange === r ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
+                className={`px-2 sm:px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-bold transition ${wealthRange === r ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}>
                 {r}
               </button>
             ))}
