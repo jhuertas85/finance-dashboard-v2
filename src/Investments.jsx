@@ -862,7 +862,7 @@ export default function Investments({ accounts = [] }) {
                     <td className="px-3 py-3"><StatusBadge status={pos.status} /></td>
                     <td className="px-2 py-3">
                       <button onClick={() => setEditingPos(pos)}
-                        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 text-gray-500 hover:text-white active:text-white rounded transition">
+                        className="p-1 text-gray-600 hover:text-white active:text-white rounded transition">
                         ✏️
                       </button>
                     </td>
