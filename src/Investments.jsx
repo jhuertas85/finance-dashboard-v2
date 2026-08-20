@@ -82,7 +82,7 @@ const SEED = {
 };
 
 // Analysis fields driven by code — merged over Firestore on every load
-const ANALYSIS_FIELDS = ['status', 'addLevels', 'trimLevels', 'notes'];
+const ANALYSIS_FIELDS = ['status', 'addLevels', 'trimLevels', 'notes', 'invalidation', 'theme', 'bucket'];
 function mergeAnalysis(firestoreData) {
   // Active positions that have been closed via SEED (closedFromActiveId links closed → active id)
   const seedClosedActiveIds = new Set(
@@ -134,7 +134,7 @@ function TypeBadge({ type }) {
 }
 
 function StatusBadge({ status }) {
-  const s = { HOLD: 'bg-neutral-800 text-gray-400 border-neutral-700', ACCUMULATE: 'bg-blue-900/40 text-blue-300 border-blue-700/50', WATCH: 'bg-amber-900/40 text-amber-300 border-amber-700/50', TRIM: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50' };
+  const s = { HOLD: 'bg-neutral-800 text-gray-400 border-neutral-700', ACCUMULATE: 'bg-blue-900/40 text-blue-300 border-blue-700/50', WATCH: 'bg-amber-900/40 text-amber-300 border-amber-700/50', TRIM: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50', EXIT: 'bg-red-900/50 text-red-300 border-red-700/60' };
   return <span className={`inline-block text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${s[status] || s.HOLD}`}>{status}</span>;
 }
 
@@ -307,7 +307,7 @@ function EditPositionModal({ pos, onSave, onClose, onDelete, onBuy, onSell }) {
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lbl}>Status</label>
               <select className={inp} value={form.status} onChange={e => f('status', e.target.value)}>
-                {['HOLD', 'ACCUMULATE', 'WATCH', 'TRIM'].map(s => <option key={s}>{s}</option>)}
+                {['HOLD', 'ACCUMULATE', 'WATCH', 'TRIM', 'EXIT'].map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div><label className={lbl}>Notes</label><input className={inp} value={form.notes} onChange={e => f('notes', e.target.value)} /></div>
@@ -838,6 +838,7 @@ export default function Investments({ accounts = [] }) {
                       <div className="w-full overflow-hidden">
                         <TriggerRail price={pos.price} addLevels={pos.addLevels} trimLevels={pos.trimLevels} status={pos.status} currency={pos.currency} type={pos.type} />
                         {pos.notes && <div className="text-[10px] text-gray-600 mt-1 italic line-clamp-2 break-words">{pos.notes}</div>}
+                        {pos.invalidation && <div className="text-[10px] text-red-900/80 mt-0.5 truncate" title={pos.invalidation}>⛔ {pos.invalidation}</div>}
                       </div>
                     </td>
                     <td className="px-3 py-3"><StatusBadge status={pos.status} /></td>
