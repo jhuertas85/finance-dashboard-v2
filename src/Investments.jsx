@@ -43,10 +43,10 @@ const SEED = {
     { id: 'avgo', ticker: 'AVGO', name: 'Broadcom', platform: 'WIO', type: 'STK', shares: 5.79772382, price: 392.13, costPerShare: 395.40, currency: 'USD', status: 'ACCUMULATE', addLevels: [{ price: 345, amount: '$1,200' }, { price: 310, amount: '$1,200' }], trimLevels: [{ price: 530, action: 'trim 2 sh' }], notes: 'At $370 below cost $395 · earnings 2 Sep catalyst · AI semi $16B · consensus $526 · +42% upside', invalidation: 'below $285 = custom silicon wins drying up → EXIT', theme: 'AI-compute', bucket: 'discretionary' },
     { id: 'meta', ticker: 'META', name: 'Meta Platforms', platform: 'WIO', type: 'STK', shares: 4.93349486, price: 563.85, costPerShare: 593.78, currency: 'USD', status: 'ACCUMULATE', addLevels: [{ price: 540, amount: '$500' }, { price: 500, amount: '$500' }], trimLevels: [{ price: 750, action: 'trim 1.5 sh' }, { price: 900, action: 'trim 2 sh' }], notes: 'EPS miss (one-time charges) · $578 below cost $594 · consensus $754 · 30% upside · ad revenue solid', invalidation: 'below $430 = ad revenue structural decline → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary' },
     { id: 'amzn', ticker: 'AMZN', name: 'Amazon', platform: 'WIO', type: 'STK', shares: 9.89225353, price: 232.79, costPerShare: 208.12, currency: 'USD', status: 'HOLD', addLevels: [{ price: 235, amount: '$800' }], trimLevels: [{ price: 290, action: 'trim 3 sh' }, { price: 325, action: 'trim 3 sh' }], notes: 'AWS $1T goal · at $262 · consensus $328 · 25% upside · let it compound · no rush to add', invalidation: 'below $195 = AWS growth slowdown → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary' },
-    { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 93.01, costPerShare: 102.81, currency: 'USD', status: 'ACCUMULATE', addLevels: [{ price: 98, amount: '$800' }, { price: 88, amount: '$1,000' }], trimLevels: [{ price: 148, action: 'trim 4 sh — at/above consensus' }, { price: 175, action: 'trim 3 sh' }], notes: '⚠G6: $93→$148 (+59%) multi-src confirmed · AI ACV $1B · if $148 real → TRIM at consensus $142', invalidation: 'below $80 = AI monetization stalls → EXIT', theme: 'AI-compute', bucket: 'discretionary' },
+    { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 93.01, costPerShare: 102.81, currency: 'USD', status: 'TRIM', addLevels: [], trimLevels: [{ price: 148, action: 'trim 3 sh now — at/above consensus $142' }, { price: 175, action: 'trim 3 sh — WF bull target' }], notes: 'At $148 above consensus $142 · Sep forecast $132-138 (pullback risk) · WF $175 bull · trim 3, hold 7 for $175', invalidation: 'below $80 = AI monetization stalls → EXIT', theme: 'AI-compute', bucket: 'discretionary' },
     { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 795.24, costPerShare: 809.73, currency: 'USD', status: 'HOLD', addLevels: [{ price: 790, amount: '$1,000' }], trimLevels: [], notes: 'S&P at 52-wk high $840 · at $831 · active book recovering · add only on -5%+ dips to $790', invalidation: 'n/a — broad market base', theme: 'index-base', bucket: 'discretionary' },
     { id: 'koid', ticker: 'KOID', name: 'KraneShares Humanoid AI ETF', platform: 'WIO', type: 'STK', shares: 40.8936337, price: 36.68, costPerShare: 36.68, currency: 'USD', status: 'ACCUMULATE', addLevels: [{ price: 33, amount: '$500' }, { price: 30, amount: '$800' }], trimLevels: [{ price: 55, action: 'trim 10 sh' }, { price: 65, action: 'trim 15 sh' }], notes: 'Humanoid robotics ETF · at cost $36.68 · robotics secular theme 2026+ · Unitree IPO exposure · add on dips', invalidation: 'below $28 = robotics hype cooling → EXIT', theme: 'robotics', bucket: 'discretionary' },
-    { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.07539626, price: 69.10, costPerShare: 161.14, currency: 'USD', status: 'WATCH', addLevels: [], trimLevels: [{ price: 140, action: 'partial exit' }], notes: '⚠G6: $69→$103 (+50%) confirmed · G2 per-pos lifted (-36% vs cost) · crypto bucket 18% > cap · no adds', invalidation: 'below $40 = ecosystem collapse → EXIT', theme: 'crypto', bucket: 'discretionary' },
+    { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.07539626, price: 69.10, costPerShare: 161.14, currency: 'USD', status: 'WATCH', addLevels: [], trimLevels: [{ price: 140, action: 'partial exit' }], notes: 'At $103 · G2 per-pos lifted (-36% vs cost) · crypto bucket 18% > 10% cap → no new adds · trim at $140', invalidation: 'below $40 = ecosystem collapse → EXIT', theme: 'crypto', bucket: 'discretionary' },
     // WIO — managed products
     { id: 'wio-wealth', ticker: 'WIO-W', name: 'WIO Wealth · Travel Goal', platform: 'WIO', type: 'WLT', shares: 1, price: 2511.07, costPerShare: 2297.44, currency: 'USD', status: 'HOLD', addLevels: [], trimLevels: [], notes: 'Managed · travel goal · target $10k', invalidation: 'n/a — managed product', theme: 'other', bucket: 'discretionary' },
     { id: 'wio-growth', ticker: 'WIO-G', name: 'WIO Growth Accelerator', platform: 'WIO', type: 'WLT', shares: 1, price: 1950.91, costPerShare: 2000, currency: 'USD', status: 'HOLD', addLevels: [], trimLevels: [], notes: 'Managed · growth accelerator · manager-rebalanced · monitor value vs goal', invalidation: 'n/a — managed product', theme: 'other', bucket: 'discretionary' },
@@ -55,8 +55,8 @@ const SEED = {
     { id: 'talabat', ticker: 'TALABAT', name: 'Talabat Holding', platform: 'DH/Talabat', type: 'STK', shares: 6250, price: 0.96, costPerShare: 1.60, currency: 'AED', addLevels: [], trimLevels: [], status: 'WATCH', isEmployerStock: true, notes: 'Employer stock · AED 1.17-1.20 (stored 0.96 +25%) · analyst target 1.35 · hold to cost 1.60 · DHER deal tailwind', invalidation: 'Uber deal impairs or <AED 0.80 → reassess', theme: 'other', bucket: 'company' },
     // Binance
     { id: 'shib', ticker: 'SHIB', name: 'Shiba Inu', platform: 'Binance', type: 'CRY', shares: 33631778.8241496213, price: 0.00000458, costPerShare: 0.0000072, currency: 'USD', status: 'WATCH', addLevels: [], trimLevels: [], notes: 'Meme · -30% vs cost · $0.00000501 · no catalysts · year-end forecast $0.00000715 · hold or exit', invalidation: 'below $0.000003 = meme cycle over → EXIT', theme: 'crypto', bucket: 'discretionary' },
-    { id: 'eth', ticker: 'ETH', name: 'Ethereum', platform: 'Binance', type: 'CRY', shares: 1.031663937, price: 1658.07, costPerShare: 3586.88, currency: 'USD', status: 'WATCH', addLevels: [], trimLevels: [{ price: 4000, action: 'break-even exit' }], notes: '⚠G6: $1,658→$2,450 (+48%) confirmed · G2 per-pos lifted (-32% vs cost) · ETF inflows $1.4B 10-day streak', invalidation: 'below $1,200 = structural loss of demand → EXIT', theme: 'crypto', bucket: 'discretionary' },
-    { id: 'sol-binance', ticker: 'SOL', name: 'Solana (Binance)', platform: 'Binance', type: 'CRY', shares: 40.1310624738, price: 69.13, costPerShare: 159.46, currency: 'USD', status: 'WATCH', addLevels: [], trimLevels: [{ price: 140, action: 'partial exit' }], notes: '⚠G6: $69→$103 (+50%) confirmed · G2 per-pos lifted (-36% vs cost) · bucket 18%>cap · no adds', invalidation: 'below $40 = ecosystem collapse → EXIT', theme: 'crypto', bucket: 'discretionary' },
+    { id: 'eth', ticker: 'ETH', name: 'Ethereum', platform: 'Binance', type: 'CRY', shares: 1.031663937, price: 1658.07, costPerShare: 3586.88, currency: 'USD', status: 'WATCH', addLevels: [], trimLevels: [{ price: 4000, action: 'break-even exit' }], notes: 'At $2,450 · G2 per-pos lifted (-32% vs cost) · ETF inflows $1.4B 10-day streak · bucket 18% > cap · no adds', invalidation: 'below $1,200 = structural loss of demand → EXIT', theme: 'crypto', bucket: 'discretionary' },
+    { id: 'sol-binance', ticker: 'SOL', name: 'Solana (Binance)', platform: 'Binance', type: 'CRY', shares: 40.1310624738, price: 69.13, costPerShare: 159.46, currency: 'USD', status: 'WATCH', addLevels: [], trimLevels: [{ price: 140, action: 'partial exit' }], notes: 'At $103 · G2 per-pos lifted (-36% vs cost) · crypto bucket 18% > 10% cap · no new adds · trim at $140', invalidation: 'below $40 = ecosystem collapse → EXIT', theme: 'crypto', bucket: 'discretionary' },
   ],
   closedPositions: [
     { id: 'cake-c', closedFromActiveId: 'cake', ticker: 'CAKE', platform: 'WIO', type: 'STK', closedDate: '31 Jul 26', qty: 11, sellPrice: '$101.62', costAED: 534, proceeds: 1118, gainLoss: 584, pct: 109.5 },
@@ -83,21 +83,19 @@ const SEED = {
     dryCash: 5500,
     addPriority: 'AVGO (earnings 2 Sep) → NVDA → META → KOID → AMZN',
     lastUpdated: null,
-    analysisDate: '2026-09-01T09:00:00.000Z',
+    analysisDate: '2026-09-01T14:00:00.000Z',
     portfolio: {
       concentration: { AMD: 26.0, NVDA: 14.2, CSPX: 9.0, 'SOL-Binance': 9.0, META: 6.2, AMZN: 5.6, 'WIO-W': 5.5, ETH: 5.5, AVGO: 4.7, 'WIO-G': 4.3, NOW: 3.2, KOID: 3.2, 'SOL-WIO': 3.2, SHIB: 0.4 },
       factorMap: { 'AI-compute': 48.1, crypto: 18.0, 'mega-cap-growth': 11.9, 'index-base': 9.0, other: 9.7, robotics: 3.2 },
       cryptoPct: 18.0,
       cashPct: 11.6,
       flags: [
-        '⚠ VERIFY: NOW stored $93 vs fetched $148 (+59%) — if confirmed: TRIM (above consensus $142)',
-        '⚠ VERIFY: SOL stored $69 vs fetched $103 (+50%) — if confirmed: G2 per-position restriction lifted',
-        '⚠ VERIFY: ETH stored $1,658 vs fetched $2,450 (+48%) — if confirmed: G2 per-position restriction lifted',
-        'Crypto 18.0% > 10% cap — Guardrail 2 bucket: no new crypto adds regardless',
-        'AMD +241% — Guardrail 3: sell 6 sh ~$470 still pending (trim now)',
-        'AI-compute 48.1% — just under 50% G5 cap; adding to NVDA+AVGO simultaneously would breach it'
+        'Crypto 18.0% > 10% cap — Guardrail 2: no new crypto adds',
+        'AMD +241% — Guardrail 3: sell 5 sh ~$470 today, buy-back trigger $420',
+        'NOW at/above consensus $142 — TRIM 3 sh; hold 7 for Wells Fargo $175 bull target',
+        'AI-compute 48.1% — adding to NVDA+AVGO simultaneously would breach 50% G5 cap; pick one'
       ],
-      benchmarkVsCSPX: 'Active book recovering: NOW +59%, SOL +50%, ETH +48% since Aug 20; CSPX flat at $831',
+      benchmarkVsCSPX: 'Active book outperforming since Aug 20: NOW +59%, SOL +50%, ETH +48% vs CSPX flat $831',
     },
   },
 };
