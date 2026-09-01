@@ -45,6 +45,7 @@ const SEED = {
     { id: 'amzn', ticker: 'AMZN', name: 'Amazon', platform: 'WIO', type: 'STK', shares: 9.89225353, price: 232.79, costPerShare: 208.12, currency: 'USD', status: 'HOLD', addLevels: [{ price: 235, amount: '$800' }], trimLevels: [{ price: 290, action: 'trim 3 sh' }, { price: 325, action: 'trim 3 sh' }], notes: 'AWS $1T goal · margin 39.4% · $496B backlog · $262→consensus $322 · 22% upside · no rush to add here', invalidation: 'below $195 = AWS growth slowdown → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary' },
     { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 93.01, costPerShare: 102.81, currency: 'USD', status: 'ACCUMULATE', addLevels: [{ price: 98, amount: '$800' }, { price: 88, amount: '$1,000' }], trimLevels: [{ price: 145, action: 'trim 3 sh' }, { price: 175, action: 'trim 3 sh' }], notes: 'At $107 (+15% since Jul) · consensus $140 · Wells Fargo $175 · AI ACV strong · next earnings Oct 27', invalidation: 'below $80 = AI monetization stalls → EXIT', theme: 'AI-compute', bucket: 'discretionary' },
     { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 795.24, costPerShare: 809.73, currency: 'USD', status: 'HOLD', addLevels: [{ price: 790, amount: '$1,000' }], trimLevels: [], notes: 'S&P near 52-wk high $840 · active book lagging CSPX -8.6pp since Jul 31 (AMD drag) · add on -5% dips only', invalidation: 'n/a — broad market base', theme: 'index-base', bucket: 'discretionary' },
+    { id: 'koid', ticker: 'KOID', name: 'KOID', platform: 'WIO', type: 'STK', shares: 40.8936337, price: 36.68, costPerShare: 36.68, currency: 'USD', status: 'HOLD', addLevels: [], trimLevels: [], notes: '', invalidation: '', theme: 'other', bucket: 'discretionary' },
     { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.07539626, price: 69.10, costPerShare: 161.14, currency: 'USD', status: 'WATCH', addLevels: [], trimLevels: [{ price: 140, action: 'partial exit' }], notes: 'G2 triggered: -54% vs cost · no new adds · 159M daily txns · $74 · trim at $140 · re-underwrite to add', invalidation: 'below $40 = ecosystem collapse → EXIT', theme: 'crypto', bucket: 'discretionary' },
     // WIO — managed products
     { id: 'wio-wealth', ticker: 'WIO-W', name: 'WIO Wealth · Travel Goal', platform: 'WIO', type: 'WLT', shares: 1, price: 2511.07, costPerShare: 2297.44, currency: 'USD', status: 'HOLD', addLevels: [], trimLevels: [], notes: 'Managed · travel goal · target $10k', invalidation: 'n/a — managed product', theme: 'other', bucket: 'discretionary' },
@@ -107,6 +108,8 @@ function mergeAnalysis(firestoreData) {
     SEED.closedPositions.map(p => p.closedFromActiveId).filter(Boolean)
   );
 
+  const firestorePosIds = new Set((firestoreData.positions || []).map(p => p.id));
+
   const positions = (firestoreData.positions || [])
     .filter(fsPos => !seedClosedActiveIds.has(fsPos.id))
     .map(fsPos => {
@@ -117,12 +120,16 @@ function mergeAnalysis(firestoreData) {
       return { ...fsPos, ...overrides };
     });
 
+  // Include SEED positions not yet saved to Firestore (e.g. newly added positions)
+  const seedOnlyPositions = SEED.positions.filter(s => !firestorePosIds.has(s.id) && !seedClosedActiveIds.has(s.id));
+  const allPositions = [...positions, ...seedOnlyPositions];
+
   // Prepend SEED-driven closed positions not already stored in Firestore
   const firestoreClosedIds = new Set((firestoreData.closedPositions || []).map(p => p.id));
   const seedClosedToAdd = SEED.closedPositions.filter(p => !firestoreClosedIds.has(p.id));
   const closedPositions = [...seedClosedToAdd, ...(firestoreData.closedPositions || [])];
 
-  return { ...firestoreData, positions, closedPositions, config: { ...firestoreData.config, analysisDate: SEED.config.analysisDate, portfolio: SEED.config.portfolio } };
+  return { ...firestoreData, positions: allPositions, closedPositions, config: { ...firestoreData.config, analysisDate: SEED.config.analysisDate, portfolio: SEED.config.portfolio } };
 }
 
 // ─── CoinGecko IDs ────────────────────────────────────────────────────────────
