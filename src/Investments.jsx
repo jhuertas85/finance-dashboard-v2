@@ -697,21 +697,39 @@ export default function Investments({ accounts = [] }) {
   if (loading) return <div className="flex items-center justify-center py-20 text-gray-500">Loading investments…</div>;
 
   const pnlCls = (n) => n >= 0 ? 'text-emerald-400' : 'text-red-400';
+
+  function handlePrint() {
+    const wasOpen = showClosed;
+    setShowClosed(true);
+    setTimeout(() => {
+      window.print();
+      window.addEventListener('afterprint', () => { if (!wasOpen) setShowClosed(false); }, { once: true });
+    }, 200);
+  }
   const symCur = (cur) => cur === 'EUR' ? '€' : cur === 'AED' ? 'AED ' : '$';
 
   return (
     <div className="space-y-5 pb-16">
 
+      {/* ── Print-only report title ── */}
+      <div className="hidden print:block mb-2">
+        <h1 className="text-base font-bold text-white tracking-tight">Investment Command — Portfolio Report</h1>
+        <p className="text-[10px] text-gray-500 mt-0.5">
+          Printed {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+          {lastAnalysis && ` · Analysis: ${lastAnalysis}`}
+        </p>
+      </div>
+
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">Investment Command</h2>
-          <p className="text-xs text-gray-600 mt-0.5 flex gap-2">
+          <h2 className="text-lg font-bold text-white tracking-tight print:hidden">Investment Command</h2>
+          <p className="text-xs text-gray-600 mt-0.5 flex gap-2 print:hidden">
             {lastUpdated && <span>Prices as of {lastUpdated}</span>}
             {lastAnalysis && <><span className="text-gray-700">·</span><span>Analysis {lastAnalysis}</span></>}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div className="flex items-center gap-2 flex-wrap justify-end print:hidden">
           {saving && <span className="text-xs text-gray-500">Saving…</span>}
           {priceMsg && <span className="text-xs text-gray-500 max-w-xs text-right">{priceMsg}</span>}
 
@@ -755,6 +773,10 @@ export default function Investments({ accounts = [] }) {
             className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5">
             {refreshing ? <span className="animate-spin">⟳</span> : '⟳'} Refresh Prices
           </button>
+          <button onClick={handlePrint}
+            className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-gray-300 rounded-xl text-xs font-semibold hover:border-neutral-500 transition flex items-center gap-1.5">
+            📄 PDF
+          </button>
         </div>
       </div>
 
@@ -781,7 +803,7 @@ export default function Investments({ accounts = [] }) {
         <button onClick={() => {
           const v = prompt('Set dry powder (USD):', data.config?.dryCash || 0);
           if (v !== null && !isNaN(+v)) persist({ ...data, config: { ...data.config, dryCash: +v } });
-        }} className="text-[10px] text-gray-600 hover:text-gray-400 border border-neutral-800 rounded px-1.5 py-0.5 transition">edit</button>
+        }} className="text-[10px] text-gray-600 hover:text-gray-400 border border-neutral-800 rounded px-1.5 py-0.5 transition print:hidden">edit</button>
         <div className="text-[10px] text-gray-600">Priority if several fire: <span className="text-gray-400 font-mono">{data.config?.addPriority}</span></div>
       </div>
 
@@ -815,7 +837,7 @@ export default function Investments({ accounts = [] }) {
                   <th className="text-right px-3 py-2 hidden sm:table-cell">Wt</th>
                   <th className="px-4 py-2 w-[290px]">ADD ◂— now —▸ TRIM</th>
                   <th className="px-3 py-2">Status</th>
-                  <th className="px-2 py-2 w-6"></th>
+                  <th className="px-2 py-2 w-6 print:hidden"></th>
                 </tr>
               </thead>
               <tbody>
@@ -867,7 +889,7 @@ export default function Investments({ accounts = [] }) {
                       </div>
                     </td>
                     <td className="px-3 py-3"><StatusBadge status={pos.status} /></td>
-                    <td className="px-2 py-3">
+                    <td className="px-2 py-3 print:hidden">
                       <button onClick={() => setEditingPos(pos)}
                         className="p-1 text-gray-600 hover:text-white active:text-white rounded transition">
                         ✏️
