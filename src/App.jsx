@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, setDoc, doc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import Dashboard from './Dashboard.jsx';
 import Transactions from './Transactions.jsx';
@@ -22,6 +22,7 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [budgets, setBudgets] = useState([]);
   const [recurringBills, setRecurringBills] = useState([]);
+  const [snapshots, setSnapshots] = useState([]);
   const [selectedCurrency, setSelectedCurrency] = useState('OWN');
   const [fxRates, setFxRates] = useState(DEFAULT_FX);
   const [fxLastUpdated, setFxLastUpdated] = useState(null);
@@ -55,7 +56,7 @@ export default function App() {
   function setupListeners() {
     setLoading(true);
     setError('');
-    let loaded = { accounts: false, tx: false, budgets: false, bills: false };
+    let loaded = { accounts: false, tx: false, budgets: false, bills: false, snapshots: false };
 
     function checkDone() {
       if (Object.values(loaded).every(Boolean)) setLoading(false);
@@ -81,7 +82,12 @@ export default function App() {
       loaded.bills = true; checkDone();
     }, err => { setError(err.message); setLoading(false); });
 
-    return () => { unsubAccounts(); unsubTx(); unsubBudgets(); unsubBills(); };
+    const unsubSnapshots = onSnapshot(collection(db, 'networth_snapshots'), snap => {
+      setSnapshots(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      loaded.snapshots = true; checkDone();
+    }, err => { setError(err.message); setLoading(false); });
+
+    return () => { unsubAccounts(); unsubTx(); unsubBudgets(); unsubBills(); unsubSnapshots(); };
   }
 
   async function fetchFxRates() {
@@ -246,6 +252,7 @@ export default function App() {
             selectedCurrency={selectedCurrency}
             fxRates={fxRates}
             darkMode={darkMode}
+            snapshots={snapshots}
             onReviewBills={() => { setAddTxInitialTab('recurring'); setShowAddTx(true); }}
             onNavigateToTx={navigateToTx}
           />

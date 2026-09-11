@@ -243,6 +243,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedCount, setSavedCount] = useState(0);
+  const [linkedDebtId, setLinkedDebtId] = useState('');
 
   // ── Last known amount per bill — from expectedAmountAED field, then last matching transaction
   const lastKnownAmounts = useMemo(() => {
@@ -302,6 +303,27 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   const toCurrency   = toAcct?.currency   || fromCurrency;
   const isCrossCurrency = type === 'transfer' && !!toAcct && fromCurrency !== toCurrency;
 
+  // Insurance debt accounts — future liabilities (excludes credit cards)
+  const insuranceDebtAccounts = accounts.filter(a =>
+    a.netWorthBucket === 'future' && a.kind === 'liability' && a.includeInNetWorth
+  );
+
+  // Auto-suggest a linked debt based on expense description
+  const suggestedDebtId = useMemo(() => {
+    const desc = description.toLowerCase();
+    if (desc.includes('mapfre 2') || desc.includes('mapfre2')) return insuranceDebtAccounts.find(a => a.id.includes('mapfre_2'))?.id || '';
+    if (desc.includes('mapfre')) return insuranceDebtAccounts.find(a => a.id.includes('mapfre') && !a.id.includes('mapfre_2'))?.id || '';
+    if (desc.includes('pacifico accidente') || desc.includes('accidente')) return insuranceDebtAccounts.find(a => a.id.includes('accidente'))?.id || '';
+    if (desc.includes('pacifico')) return insuranceDebtAccounts.find(a => a.id.includes('pacifico') && !a.id.includes('accidente'))?.id || '';
+    return '';
+  }, [description, insuranceDebtAccounts]);
+
+  useEffect(() => {
+    if (category === 'Investments' && type === 'expense') {
+      setLinkedDebtId(suggestedDebtId);
+    }
+  }, [suggestedDebtId, category, type]);
+
   // Paid-this-month detection: only match transactions explicitly saved via Pay Now
   // (by recurringBillId, or by old notes='Recurring bill' + exact description match)
   const thisMonthTx = useMemo(() => {
@@ -325,7 +347,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
     );
   }
 
-  function reset() { setDescription(''); setAmountExpr(''); setAmountToExpr(''); setNotes(''); setBorrower(''); setError(''); }
+  function reset() { setDescription(''); setAmountExpr(''); setAmountToExpr(''); setNotes(''); setBorrower(''); setError(''); setLinkedDebtId(''); }
 
   // ── Manual save
   async function save(keepOpen = false) {
@@ -368,6 +390,19 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
       } else if (type === 'transfer') {
         if (acct) await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - amount });
         if (toAcct) await updateDoc(doc(db, 'accounts', toAcct.id), { currentBalance: toAcct.currentBalance + amountTo });
+      }
+
+      // Reduce linked insurance debt if selected
+      if (type === 'expense' && linkedDebtId) {
+        const debtAcct = accounts.find(a => a.id === linkedDebtId);
+        if (debtAcct) {
+          // Convert payment amount to debt account's native currency
+          const amtInDebtCurrency = (amount * FX[fromCurrency]) / FX[debtAcct.currency];
+          // Debt currentBalance is negative (e.g. -43000); adding a positive number reduces the absolute debt
+          await updateDoc(doc(db, 'accounts', debtAcct.id), {
+            currentBalance: debtAcct.currentBalance + amtInDebtCurrency,
+          });
+        }
       }
 
       setSavedCount(n => n + 1);
@@ -604,6 +639,33 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                 <input type="text" value={borrower} onChange={e => setBorrower(e.target.value)}
                   placeholder="Who borrowed this?"
                   className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600" />
+              </div>
+            )}
+            {type === 'expense' && category === 'Investments' && insuranceDebtAccounts.length > 0 && (
+              <div className="rounded-xl border border-amber-800/40 bg-amber-950/10 p-3">
+                <div className="text-[11px] font-bold text-amber-400 mb-2">Reduce insurance debt?</div>
+                <select
+                  value={linkedDebtId}
+                  onChange={e => setLinkedDebtId(e.target.value)}
+                  className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white text-xs">
+                  <option value="">— None (expense only) —</option>
+                  {insuranceDebtAccounts.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} (balance: {a.currency} {Math.abs(a.currentBalance).toLocaleString('en-US', { maximumFractionDigits: 0 })})
+                    </option>
+                  ))}
+                </select>
+                {linkedDebtId && (() => {
+                  const da = accounts.find(a => a.id === linkedDebtId);
+                  const amt = evalExpr(amountExpr);
+                  if (!da || !amt) return null;
+                  const converted = (amt * FX[fromCurrency]) / FX[da.currency];
+                  return (
+                    <div className="text-[10px] text-amber-300/70 mt-1.5">
+                      Will reduce debt by {da.currency} {converted.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
             <div>

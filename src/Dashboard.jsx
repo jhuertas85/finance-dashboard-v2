@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from './firebase-config.js';
 import {
   XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ComposedChart, Area, Bar, Line,
@@ -45,7 +47,7 @@ function spendBarColor(pct) {
   return '#10b981';
 }
 
-export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED', fxRates = {}, onReviewBills, onNavigateToTx }) {
+export default function Dashboard({ accounts, transactions, budgets, recurringBills = [], selectedCurrency = 'AED', fxRates = {}, onReviewBills, onNavigateToTx, snapshots = [] }) {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
@@ -141,6 +143,26 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     )
     .sort((a, b) => Math.abs(toAED(b.currentBalance, b.currency)) - Math.abs(toAED(a.currentBalance, a.currency)));
   const futureLiabilitiesTotal = futureLiabilityAccounts.reduce((s, a) => s + Math.abs(toAED(a.currentBalance, a.currency)), 0);
+
+  const snapshotByKey = useMemo(() => {
+    const m = {};
+    snapshots.forEach(s => { if (s.id) m[s.id] = s; });
+    return m;
+  }, [snapshots]);
+
+  useEffect(() => {
+    if (!accounts.length) return;
+    const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    if (snapshotByKey[nowKey]) return;
+    const snap = {
+      date: now.toISOString().slice(0, 10),
+      capital: Math.round(capitalTotal),
+      usable: Math.round(usableTotal),
+      future: Math.round(futureAssetsTotal - futureLiabilitiesTotal),
+      netWorth: Math.round(capitalTotal + usableTotal + futureAssetsTotal - futureLiabilitiesTotal),
+    };
+    setDoc(doc(db, 'networth_snapshots', nowKey), snap).catch(() => {});
+  }, [accounts, snapshotByKey]);
 
   const creditCardAccounts = accounts
     .filter(a => a.netWorthBucket === 'debt' && a.name.toLowerCase().includes('credit'))
@@ -386,7 +408,9 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     const usableByKey = {};
     let us = usableTotal;
     for (let i = histMonths.length - 1; i >= 0; i--) {
-      usableByKey[histMonths[i]] = Math.round(us);
+      const k = histMonths[i];
+      // Use snapshot if available, otherwise fall back to transfer-flow reconstruction
+      usableByKey[k] = snapshotByKey[k]?.usable ?? Math.round(us);
       if (i > 0) us -= (usableFlows[histMonths[i]] || 0);
     }
     for (const key of months.filter(k => k > nowKey).sort()) {
@@ -412,7 +436,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         // Historical stacked areas (solid)
         CapHist: isHist ? c : undefined,
         UsableHist: isHist ? u : undefined,
-        FutHist: isHist ? f : undefined,
+        FutHist: isHist ? (snapshotByKey[key]?.future ?? f) : undefined,
         NWHist: isHist ? nw : undefined,
         // Projected boundary lines — start at current month so they visually connect to the areas
         CapPB: (isFuture || isCurrent) ? c : undefined,
@@ -420,7 +444,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         NWProj: (isFuture || isCurrent) ? nw : undefined,
       };
     });
-  }, [transactions, accounts, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange]);
+  }, [transactions, accounts, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange, snapshotByKey]);
 
   // ─── Recurring bills alerts ──────────────────────────────────────────────────
   const thisMonthBillTx = transactions.filter(tx => {
