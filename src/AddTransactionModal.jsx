@@ -308,15 +308,19 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
     a.netWorthBucket === 'future' && a.kind === 'liability' && a.includeInNetWorth
   );
 
-  // Auto-suggest a linked debt based on expense description
-  const suggestedDebtId = useMemo(() => {
-    const desc = description.toLowerCase();
-    if (desc.includes('mapfre 2') || desc.includes('mapfre2')) return insuranceDebtAccounts.find(a => a.id.includes('mapfre_2'))?.id || '';
-    if (desc.includes('mapfre')) return insuranceDebtAccounts.find(a => a.id.includes('mapfre') && !a.id.includes('mapfre_2'))?.id || '';
-    if (desc.includes('pacifico accidente') || desc.includes('accidente')) return insuranceDebtAccounts.find(a => a.id.includes('accidente'))?.id || '';
-    if (desc.includes('pacifico')) return insuranceDebtAccounts.find(a => a.id.includes('pacifico') && !a.id.includes('accidente'))?.id || '';
+  // Match a description/name string to the right insurance debt account id
+  function matchInsuranceDebt(nameOrDesc) {
+    const s = (nameOrDesc || '').toLowerCase();
+    if (s.includes('mapfre 2') || s.includes('mapfre2')) return insuranceDebtAccounts.find(a => a.id.includes('mapfre_2'))?.id || '';
+    if (s.includes('mapfre')) return insuranceDebtAccounts.find(a => a.id.includes('mapfre') && !a.id.includes('mapfre_2'))?.id || '';
+    if (s.includes('pacifico accidente') || s.includes('accidente')) return insuranceDebtAccounts.find(a => a.id.includes('accidente'))?.id || '';
+    if (s.includes('pacifico')) return insuranceDebtAccounts.find(a => a.id.includes('pacifico') && !a.id.includes('accidente'))?.id || '';
     return '';
-  }, [description, insuranceDebtAccounts]);
+  }
+
+  // Auto-suggest a linked debt based on expense description
+  const suggestedDebtId = useMemo(() => matchInsuranceDebt(description),
+    [description, insuranceDebtAccounts]);
 
   useEffect(() => {
     if (category === 'Investments' && type === 'expense') {
@@ -434,6 +438,18 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
       if (acct) {
         const aedAmt = toAED(amount, bill.currency || 'AED');
         await updateDoc(doc(db, 'accounts', acct.id), { currentBalance: acct.currentBalance - aedAmt / (FX[acct.currency] || 1) });
+      }
+      // Auto-reduce linked insurance debt based on bill name (no prompt needed for recurring)
+      const billDebtId = matchInsuranceDebt(bill.name);
+      if (billDebtId) {
+        const debtAcct = accounts.find(a => a.id === billDebtId);
+        if (debtAcct) {
+          const billCurrency = bill.currency || 'AED';
+          const amtInDebtCurrency = (amount * (FX[billCurrency] || 1)) / (FX[debtAcct.currency] || 1);
+          await updateDoc(doc(db, 'accounts', debtAcct.id), {
+            currentBalance: debtAcct.currentBalance + amtInDebtCurrency,
+          });
+        }
       }
       setSavedCount(n => n + 1);
       if (!keepOpen) onClose();
