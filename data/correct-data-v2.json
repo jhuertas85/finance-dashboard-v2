@@ -257,7 +257,7 @@
       "name": "Peru AFP",
       "type": "investment",
       "currency": "PEN",
-      "currentBalance": 96893.12,
+      "currentBalance": 99901.85,
       "balanceMode": "manual",
       "netWorthBucket": "future",
       "kind": "asset",
