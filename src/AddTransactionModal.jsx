@@ -309,12 +309,17 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   );
 
   // Match a description/name string to the right insurance debt account id
+  // Matches by account name (not id) so it works regardless of document ID conventions
   function matchInsuranceDebt(nameOrDesc) {
     const s = (nameOrDesc || '').toLowerCase();
-    if (s.includes('mapfre 2') || s.includes('mapfre2')) return insuranceDebtAccounts.find(a => a.id.includes('mapfre_2'))?.id || '';
-    if (s.includes('mapfre')) return insuranceDebtAccounts.find(a => a.id.includes('mapfre') && !a.id.includes('mapfre_2'))?.id || '';
-    if (s.includes('pacifico accidente') || s.includes('accidente')) return insuranceDebtAccounts.find(a => a.id.includes('accidente'))?.id || '';
-    if (s.includes('pacifico')) return insuranceDebtAccounts.find(a => a.id.includes('pacifico') && !a.id.includes('accidente'))?.id || '';
+    if (s.includes('mapfre 2') || s.includes('mapfre2'))
+      return insuranceDebtAccounts.find(a => { const n = (a.name || '').toLowerCase(); return n.includes('mapfre') && n.includes('2'); })?.id || '';
+    if (s.includes('mapfre'))
+      return insuranceDebtAccounts.find(a => { const n = (a.name || '').toLowerCase(); return n.includes('mapfre') && !n.includes('2'); })?.id || '';
+    if (s.includes('pacifico accidente') || s.includes('accidente'))
+      return insuranceDebtAccounts.find(a => (a.name || '').toLowerCase().includes('accidente'))?.id || '';
+    if (s.includes('pacifico'))
+      return insuranceDebtAccounts.find(a => { const n = (a.name || '').toLowerCase(); return n.includes('pacifico') && !n.includes('accidente'); })?.id || '';
     return '';
   }
 
