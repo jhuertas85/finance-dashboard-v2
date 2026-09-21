@@ -164,6 +164,12 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       date: now.toISOString().slice(0, 10),
       usable: Math.round(usableTotal),
       future: Math.round(futureAssetsTotal - futureLiabilitiesTotal),
+      usableAccounts: usableAccounts.map(a => ({
+        id: a.id,
+        name: a.name,
+        balance: a.currentBalance,
+        currency: a.currency,
+      })),
     }).catch(() => {});
   }, [accounts, snapshotByKey]);
 
@@ -650,14 +656,41 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className="text-base bg-blue-900/50 rounded-lg p-1.5">📊</span>
             <span className="text-xs font-bold uppercase text-gray-400">Assets — Usable</span>
           </div>
-          <div className="text-2xl font-bold text-blue-400 mb-4">{fmt(usableTotal)}</div>
+          <div className="text-2xl font-bold text-blue-400 mb-4">{fmt(displayUsable)}</div>
           <div className="space-y-1.5 flex-1">
-            {usableAccounts.map(acc => (
-              <div key={acc.id} className="flex justify-between text-xs gap-2">
-                <span className="text-gray-400 truncate">{acc.name}</span>
-                <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
-              </div>
-            ))}
+            {isCurrentMonth ? (
+              usableAccounts.map(acc => (
+                <div key={acc.id} className="flex justify-between text-xs gap-2">
+                  <span className="text-gray-400 truncate">{acc.name}</span>
+                  <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
+                </div>
+              ))
+            ) : (() => {
+              const snap = snapshotByKey[viewKey] ?? latestSnapBefore(viewKey);
+              const snapAccounts = snap?.usableAccounts ?? [];
+              if (snapAccounts.length === 0) {
+                return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(viewYear, viewMonth)}</div>;
+              }
+              return snapAccounts.map(sa => {
+                const live = usableAccounts.find(a => a.id === sa.id);
+                const snapAED = toAED(sa.balance, sa.currency);
+                const liveAED = live ? toAED(live.currentBalance, live.currency) : null;
+                const delta = liveAED !== null ? liveAED - snapAED : null;
+                return (
+                  <div key={sa.id} className="flex justify-between text-xs gap-2 items-center">
+                    <span className="text-gray-400 truncate">{sa.name}</span>
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-gray-200 font-mono">{sa.currency} {sa.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                      {delta !== null && Math.abs(delta) > 1 && (
+                        <span className={delta > 0 ? 'text-emerald-400' : 'text-red-400'}>
+                          {delta > 0 ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                );
+              });
+            })()}
           </div>
           <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-blue-900/40">Sellable within days</div>
         </div>
@@ -668,15 +701,21 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className="text-base bg-neutral-800 rounded-lg p-1.5">🔒</span>
             <span className="text-xs font-bold uppercase text-gray-400">Assets — Future</span>
           </div>
-          <div className="text-2xl font-bold text-emerald-400 mb-1">{fmt(futureAssetsTotal - futureLiabilitiesTotal)}</div>
-          <div className="text-xs text-gray-500 mb-4">gross {fmt(futureAssetsTotal)} – {fmt(futureLiabilitiesTotal)}</div>
+          <div className="text-2xl font-bold text-emerald-400 mb-1">{fmt(displayFuture)}</div>
+          {isCurrentMonth && (
+            <div className="text-xs text-gray-500 mb-4">gross {fmt(futureAssetsTotal)} – {fmt(futureLiabilitiesTotal)}</div>
+          )}
           <div className="space-y-1.5 flex-1">
-            {futureAssetAccounts.map(acc => (
-              <div key={acc.id} className="flex justify-between text-xs gap-2">
-                <span className="text-gray-400 truncate">{acc.name}</span>
-                <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
-              </div>
-            ))}
+            {isCurrentMonth ? (
+              futureAssetAccounts.map(acc => (
+                <div key={acc.id} className="flex justify-between text-xs gap-2">
+                  <span className="text-gray-400 truncate">{acc.name}</span>
+                  <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(viewYear, viewMonth)}</div>
+            )}
           </div>
           {futureLiabilityAccounts.length > 0 && (
             <div className="mt-3 pt-3 border-t border-neutral-800">
