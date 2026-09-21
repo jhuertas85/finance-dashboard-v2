@@ -258,17 +258,13 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       ? `YTD ${viewYear}`
       : String(viewYear);
 
-  // Snapshot-aware KPI values for the selected view period
+  // Keys for the selected view period — used by KPI cards and chart lookup
   const viewKey = `${viewYear}-${String(viewMonth).padStart(2, '0')}`;
   const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1;
   const prevMonth = viewMonth === 1 ? 12 : viewMonth - 1;
   const prevYear = viewMonth === 1 ? viewYear - 1 : viewYear;
   const prevKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-  const displayNetWorth = isCurrentMonth ? netWorth.total : (snapshotByKey[viewKey]?.netWorth ?? netWorth.total);
-  const displayCapital = isCurrentMonth ? capitalTotal : (snapshotByKey[viewKey]?.capital ?? capitalTotal);
-  const prevNetWorth = snapshotByKey[prevKey]?.netWorth ?? null;
-  const nwDelta = prevNetWorth !== null ? displayNetWorth - prevNetWorth : null;
-  const nwPct = prevNetWorth !== null && prevNetWorth !== 0 ? (nwDelta / prevNetWorth) * 100 : null;
+  // displayNetWorth / displayCapital / nwDelta / nwPct are computed after wealthData below
 
   // Build category data for period spending detail
   const periodSpendingData = CATEGORIES
@@ -463,6 +459,18 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       };
     });
   }, [transactions, accounts, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange, snapshotByKey]);
+
+  // KPI card values for the selected view period.
+  // Capital uses the chart's transaction-based reconstruction (moves per month).
+  // Usable/Future use snapshots as an anchor (can't reconstruct from transactions alone).
+  const viewData = wealthData.find(d => d.key === viewKey);
+  const prevData = wealthData.find(d => d.key === prevKey);
+  const displayCapital = viewData?.capVal ?? capitalTotal;
+  const displayUsable = viewData?.usableVal ?? usableTotal;
+  const displayFuture = viewData?.futVal ?? Math.round(futureAssetsTotal - futureLiabilitiesTotal);
+  const displayNetWorth = displayCapital + displayUsable + displayFuture;
+  const nwDelta = prevData ? displayNetWorth - (prevData.capVal + prevData.usableVal + prevData.futVal) : null;
+  const nwPct = (nwDelta !== null && prevData) ? (nwDelta / (prevData.capVal + prevData.usableVal + prevData.futVal)) * 100 : null;
 
   // ─── Recurring bills alerts ──────────────────────────────────────────────────
   const thisMonthBillTx = transactions.filter(tx => {
