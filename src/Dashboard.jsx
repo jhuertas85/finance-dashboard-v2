@@ -258,6 +258,18 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       ? `YTD ${viewYear}`
       : String(viewYear);
 
+  // Snapshot-aware KPI values for the selected view period
+  const viewKey = `${viewYear}-${String(viewMonth).padStart(2, '0')}`;
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth() + 1;
+  const prevMonth = viewMonth === 1 ? 12 : viewMonth - 1;
+  const prevYear = viewMonth === 1 ? viewYear - 1 : viewYear;
+  const prevKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+  const displayNetWorth = isCurrentMonth ? netWorth.total : (snapshotByKey[viewKey]?.netWorth ?? netWorth.total);
+  const displayCapital = isCurrentMonth ? capitalTotal : (snapshotByKey[viewKey]?.capital ?? capitalTotal);
+  const prevNetWorth = snapshotByKey[prevKey]?.netWorth ?? null;
+  const nwDelta = prevNetWorth !== null ? displayNetWorth - prevNetWorth : null;
+  const nwPct = prevNetWorth !== null && prevNetWorth !== 0 ? (nwDelta / prevNetWorth) * 100 : null;
+
   // Build category data for period spending detail
   const periodSpendingData = CATEGORIES
     .map(cat => ({
@@ -524,8 +536,14 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className="text-xs font-bold uppercase text-gray-500">NET WORTH</span>
             <span className="text-lg">💎</span>
           </div>
-          <div className="text-3xl font-bold text-white mb-1">{fmt(netWorth.total)}</div>
-          <div className="text-xs text-emerald-400">+7.9% ({fmtS(netWorth.total * 0.079)}) vs last month</div>
+          <div className="text-3xl font-bold text-white mb-1">{fmt(displayNetWorth)}</div>
+          {nwPct !== null ? (
+            <div className={`text-xs ${nwDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {nwDelta >= 0 ? '+' : ''}{nwPct.toFixed(1)}% ({nwDelta >= 0 ? '+' : ''}{fmtS(nwDelta)}) vs {getMonthLabel(prevYear, prevMonth)}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-600">No prior snapshot</div>
+          )}
         </div>
 
         <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 sm:p-6">
@@ -582,14 +600,16 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className="text-base bg-purple-900/50 rounded-lg p-1.5">🏦</span>
             <span className="text-xs font-bold uppercase text-gray-400">Capital</span>
           </div>
-          <div className="text-2xl font-bold text-cyan-400 mb-4">{fmt(capitalTotal)}</div>
+          <div className="text-2xl font-bold text-cyan-400 mb-4">{fmt(displayCapital)}</div>
           <div className="space-y-1.5 flex-1">
-            {capitalAccounts.map(acc => (
+            {isCurrentMonth ? capitalAccounts.map(acc => (
               <div key={acc.id} className="flex justify-between text-xs gap-2">
                 <span className="text-gray-400 truncate">{acc.name}</span>
                 <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
               </div>
-            ))}
+            )) : (
+              <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(viewYear, viewMonth)}</div>
+            )}
           </div>
           <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-purple-900/40">Liquid · immediately available</div>
         </div>
