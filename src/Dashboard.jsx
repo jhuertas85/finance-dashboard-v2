@@ -152,16 +152,19 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
   useEffect(() => {
     if (!accounts.length) return;
-    const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    if (snapshotByKey[nowKey]) return;
-    const snap = {
+    // Write PREVIOUS month's snapshot (usable + future only — capital is always
+    // reconstructible from transactions, netWorth is derived).
+    // This runs on first open of a new month; if the prev month snapshot already
+    // exists nothing happens.
+    const prevM = now.getMonth() === 0 ? 12 : now.getMonth(); // e.g. Sep(8) → Aug(8 as 1-indexed)
+    const prevY = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const prevMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
+    if (snapshotByKey[prevMonthKey]) return;
+    setDoc(doc(db, 'networth_snapshots', prevMonthKey), {
       date: now.toISOString().slice(0, 10),
-      capital: Math.round(capitalTotal),
       usable: Math.round(usableTotal),
       future: Math.round(futureAssetsTotal - futureLiabilitiesTotal),
-      netWorth: Math.round(capitalTotal + usableTotal + futureAssetsTotal - futureLiabilitiesTotal),
-    };
-    setDoc(doc(db, 'networth_snapshots', nowKey), snap).catch(() => {});
+    }).catch(() => {});
   }, [accounts, snapshotByKey]);
 
   const creditCardAccounts = accounts
@@ -461,16 +464,35 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   }, [transactions, accounts, capitalTotal, usableTotal, futureAssetsTotal, futureLiabilitiesTotal, wealthRange, snapshotByKey]);
 
   // KPI card values for the selected view period.
-  // Capital uses the chart's transaction-based reconstruction (moves per month).
-  // Usable/Future use snapshots as an anchor (can't reconstruct from transactions alone).
+  // Capital: always transaction-reconstructed from wealthData (moves correctly per month).
+  // Usable + Future: snapshots only — can't reconstruct price changes from transactions.
+  //   Current month → live account values (investments fluctuate; snapshot is previous month).
+  //   Historical month → that month's snapshot, or latest available before it.
+  // Net worth = capital + usable + future + creditCardTotal (creditCardTotal < 0).
   const viewData = wealthData.find(d => d.key === viewKey);
   const prevData = wealthData.find(d => d.key === prevKey);
+
+  const latestSnapBefore = (key) =>
+    [...snapshots].filter(s => s.id && s.id <= key).sort((a, b) => (b.id > a.id ? 1 : -1))[0] ?? null;
+
   const displayCapital = viewData?.capVal ?? capitalTotal;
-  const displayUsable = viewData?.usableVal ?? usableTotal;
-  const displayFuture = viewData?.futVal ?? Math.round(futureAssetsTotal - futureLiabilitiesTotal);
-  const displayNetWorth = displayCapital + displayUsable + displayFuture;
-  const nwDelta = prevData ? displayNetWorth - (prevData.capVal + prevData.usableVal + prevData.futVal) : null;
-  const nwPct = (nwDelta !== null && prevData) ? (nwDelta / (prevData.capVal + prevData.usableVal + prevData.futVal)) * 100 : null;
+
+  const displayUsable = isCurrentMonth
+    ? usableTotal
+    : (snapshotByKey[viewKey]?.usable ?? latestSnapBefore(viewKey)?.usable ?? usableTotal);
+  const displayFuture = isCurrentMonth
+    ? Math.round(futureAssetsTotal - futureLiabilitiesTotal)
+    : (snapshotByKey[viewKey]?.future ?? latestSnapBefore(viewKey)?.future ?? Math.round(futureAssetsTotal - futureLiabilitiesTotal));
+
+  const displayNetWorth = displayCapital + displayUsable + displayFuture + creditCardTotal;
+
+  const prevCapital = prevData?.capVal ?? null;
+  const prevSnap = snapshotByKey[prevKey] ?? latestSnapBefore(prevKey);
+  const prevNW = (prevCapital !== null && prevSnap)
+    ? prevCapital + prevSnap.usable + prevSnap.future + creditCardTotal
+    : null;
+  const nwDelta = prevNW !== null ? displayNetWorth - prevNW : null;
+  const nwPct = (nwDelta !== null && prevNW !== 0) ? (nwDelta / prevNW) * 100 : null;
 
   // ─── Recurring bills alerts ──────────────────────────────────────────────────
   const thisMonthBillTx = transactions.filter(tx => {
