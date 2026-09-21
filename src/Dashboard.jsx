@@ -481,14 +481,20 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const latestSnapBefore = (key) =>
     [...snapshots].filter(s => s.id && s.id <= key).sort((a, b) => (b.id > a.id ? 1 : -1))[0] ?? null;
 
+  // Nearest snapshot in any direction — used as last resort so we never fall back to live values.
+  const nearestSnap = (key) => {
+    const all = [...snapshots].filter(s => s.id).sort((a, b) => a.id > b.id ? 1 : -1);
+    return latestSnapBefore(key) ?? all[0] ?? null;
+  };
+
   const displayCapital = viewData?.capVal ?? capitalTotal;
 
   const displayUsable = isCurrentMonth
     ? usableTotal
-    : (snapshotByKey[viewKey]?.usable ?? latestSnapBefore(viewKey)?.usable ?? usableTotal);
+    : (snapshotByKey[viewKey]?.usable ?? nearestSnap(viewKey)?.usable ?? usableTotal);
   const displayFuture = isCurrentMonth
     ? Math.round(futureAssetsTotal - futureLiabilitiesTotal)
-    : (snapshotByKey[viewKey]?.future ?? latestSnapBefore(viewKey)?.future ?? Math.round(futureAssetsTotal - futureLiabilitiesTotal));
+    : (snapshotByKey[viewKey]?.future ?? nearestSnap(viewKey)?.future ?? Math.round(futureAssetsTotal - futureLiabilitiesTotal));
 
   const displayNetWorth = displayCapital + displayUsable + displayFuture + creditCardTotal;
 
@@ -658,18 +664,36 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           </div>
           <div className="text-2xl font-bold text-blue-400 mb-4">{fmt(displayUsable)}</div>
           <div className="space-y-1.5 flex-1">
-            {isCurrentMonth ? (
-              usableAccounts.map(acc => (
-                <div key={acc.id} className="flex justify-between text-xs gap-2">
-                  <span className="text-gray-400 truncate">{acc.name}</span>
-                  <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
-                </div>
-              ))
-            ) : (() => {
-              const snap = snapshotByKey[viewKey] ?? latestSnapBefore(viewKey);
+            {(() => {
+              // For current month: live balances + delta vs previous month's snapshot.
+              // For historical: snapshot account rows + delta vs current live balance.
+              // In both cases fall back to nearestSnap so we never show raw live values for past months.
+              if (isCurrentMonth) {
+                const refSnap = snapshotByKey[prevKey] ?? latestSnapBefore(prevKey);
+                return usableAccounts.map(acc => {
+                  const snapAcc = refSnap?.usableAccounts?.find(sa => sa.id === acc.id);
+                  const currentAED = toAED(acc.currentBalance, acc.currency);
+                  const snapAED = snapAcc ? toAED(snapAcc.balance, snapAcc.currency) : null;
+                  const delta = snapAED !== null ? currentAED - snapAED : null;
+                  return (
+                    <div key={acc.id} className="flex justify-between text-xs gap-2 items-center">
+                      <span className="text-gray-400 truncate">{acc.name}</span>
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-gray-200 font-mono">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
+                        {delta !== null && Math.abs(delta) > 1 && (
+                          <span className={delta > 0 ? 'text-emerald-400' : 'text-red-400'}>
+                            {delta > 0 ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                });
+              }
+              const snap = snapshotByKey[viewKey] ?? nearestSnap(viewKey);
               const snapAccounts = snap?.usableAccounts ?? [];
               if (snapAccounts.length === 0) {
-                return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(viewYear, viewMonth)}</div>;
+                return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(snap ? parseInt(snap.id.split('-')[0]) : viewYear, snap ? parseInt(snap.id.split('-')[1]) : viewMonth)}</div>;
               }
               return snapAccounts.map(sa => {
                 const live = usableAccounts.find(a => a.id === sa.id);
@@ -713,9 +737,12 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                   <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
                 </div>
               ))
-            ) : (
-              <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(viewYear, viewMonth)}</div>
-            )}
+            ) : (() => {
+              const snap = snapshotByKey[viewKey] ?? nearestSnap(viewKey);
+              const snapYear = snap ? parseInt(snap.id.split('-')[0]) : viewYear;
+              const snapMonth = snap ? parseInt(snap.id.split('-')[1]) : viewMonth;
+              return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(snapYear, snapMonth)}</div>;
+            })()}
           </div>
           {futureLiabilityAccounts.length > 0 && (
             <div className="mt-3 pt-3 border-t border-neutral-800">
