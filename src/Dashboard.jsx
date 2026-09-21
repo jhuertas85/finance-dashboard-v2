@@ -665,24 +665,23 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           <div className="text-2xl font-bold text-blue-400 mb-4">{fmt(displayUsable)}</div>
           <div className="space-y-1.5 flex-1">
             {(() => {
-              // For current month: live balances + delta vs previous month's snapshot.
-              // For historical: snapshot account rows + delta vs current live balance.
-              // In both cases fall back to nearestSnap so we never show raw live values for past months.
+              // Current month: live balances + % delta vs previous month's snapshot.
+              // Historical: snapshot account rows only — no comparison (comparing past to future is misleading).
               if (isCurrentMonth) {
                 const refSnap = snapshotByKey[prevKey] ?? latestSnapBefore(prevKey);
                 return usableAccounts.map(acc => {
                   const snapAcc = refSnap?.usableAccounts?.find(sa => sa.id === acc.id);
                   const currentAED = toAED(acc.currentBalance, acc.currency);
                   const snapAED = snapAcc ? toAED(snapAcc.balance, snapAcc.currency) : null;
-                  const delta = snapAED !== null ? currentAED - snapAED : null;
+                  const pct = (snapAED !== null && snapAED !== 0) ? ((currentAED - snapAED) / snapAED) * 100 : null;
                   return (
                     <div key={acc.id} className="flex justify-between text-xs gap-2 items-center">
                       <span className="text-gray-400 truncate">{acc.name}</span>
                       <span className="flex items-center gap-1.5 shrink-0">
                         <span className="text-gray-200 font-mono">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
-                        {delta !== null && Math.abs(delta) > 1 && (
-                          <span className={delta > 0 ? 'text-emerald-400' : 'text-red-400'}>
-                            {delta > 0 ? '↑' : '↓'}
+                        {pct !== null && Math.abs(pct) > 0.1 && (
+                          <span className={pct > 0 ? 'text-emerald-400' : 'text-red-400'}>
+                            {pct > 0 ? '+' : ''}{pct.toFixed(1)}%
                           </span>
                         )}
                       </span>
@@ -690,30 +689,18 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                   );
                 });
               }
+              // Historical month — show snapshot values, no delta arrows.
               const snap = snapshotByKey[viewKey] ?? nearestSnap(viewKey);
               const snapAccounts = snap?.usableAccounts ?? [];
               if (snapAccounts.length === 0) {
                 return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(snap ? parseInt(snap.id.split('-')[0]) : viewYear, snap ? parseInt(snap.id.split('-')[1]) : viewMonth)}</div>;
               }
-              return snapAccounts.map(sa => {
-                const live = usableAccounts.find(a => a.id === sa.id);
-                const snapAED = toAED(sa.balance, sa.currency);
-                const liveAED = live ? toAED(live.currentBalance, live.currency) : null;
-                const delta = liveAED !== null ? liveAED - snapAED : null;
-                return (
-                  <div key={sa.id} className="flex justify-between text-xs gap-2 items-center">
-                    <span className="text-gray-400 truncate">{sa.name}</span>
-                    <span className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-gray-200 font-mono">{sa.currency} {sa.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
-                      {delta !== null && Math.abs(delta) > 1 && (
-                        <span className={delta > 0 ? 'text-emerald-400' : 'text-red-400'}>
-                          {delta > 0 ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                );
-              });
+              return snapAccounts.map(sa => (
+                <div key={sa.id} className="flex justify-between text-xs gap-2 items-center">
+                  <span className="text-gray-400 truncate">{sa.name}</span>
+                  <span className="text-gray-200 font-mono shrink-0">{sa.currency} {sa.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                </div>
+              ));
             })()}
           </div>
           <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-blue-900/40">Sellable within days</div>
