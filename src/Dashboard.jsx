@@ -409,8 +409,14 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     let us = usableTotal;
     for (let i = histMonths.length - 1; i >= 0; i--) {
       const k = histMonths[i];
-      // Use snapshot if available, otherwise fall back to transfer-flow reconstruction
-      usableByKey[k] = snapshotByKey[k]?.usable ?? Math.round(us);
+      if (snapshotByKey[k]) {
+        // Anchor the reconstruction to the snapshot so earlier months don't
+        // drift toward the current usableTotal (which may include new accounts)
+        us = snapshotByKey[k].usable;
+        usableByKey[k] = snapshotByKey[k].usable;
+      } else {
+        usableByKey[k] = Math.round(us);
+      }
       if (i > 0) us -= (usableFlows[histMonths[i]] || 0);
     }
     for (const key of months.filter(k => k > nowKey).sort()) {
