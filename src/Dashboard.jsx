@@ -294,30 +294,9 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
   const maxPeriodSpent = Math.max(...periodSpendingData.map(d => d.spent), 1);
   const totalPct = periodBudget > 0 ? (periodExpenses / periodBudget) * 100 : 0;
-  // Annual Savings Tracker — derived from real transaction data.
-  const currentYear = now.getFullYear();
-  // Completed months = past months with at least some income or expense recorded.
-  const completedMonthsData = monthlyFlowData.filter(d => !d.isFuture && !d.isCurrent && (d.income > 0 || d.expenses > 0));
-  const currentMonthData = monthlyFlowData.find(d => d.isCurrent);
-  // YTD: sum of completed months + current month's real transactions so far.
-  const annualSavings = completedMonthsData.reduce((s, d) => s + d.savings, 0)
-    + (currentMonthData ? currentMonthData.income - currentMonthData.expenses : 0);
-  const completedCount = completedMonthsData.length + (currentMonthData ? 1 : 0);
-  // Projected year-end: extrapolate avg monthly savings across 12 months.
-  const avgMonthlySavings = completedCount > 0 ? annualSavings / completedCount : 0;
-  const projectedYearEnd = avgMonthlySavings * 12;
-  // Progress bar: months with data vs 12, tick at current month.
-  const monthsWithData = completedMonthsData.length;
-  const pacePct = (monthsWithData / 12) * 100;
-  const expectedPct = ((now.getMonth()) / 12) * 100;
-  const aheadOfPace = annualSavings > (avgMonthlySavings * now.getMonth());
-  const savingsMonthLabel = completedMonthsData.length > 0
-    ? `${completedMonthsData[0].label.split(' ')[0]}–${completedMonthsData[completedMonthsData.length - 1].label.split(' ')[0]} + this month`
-    : 'This month only';
-
   // ─── Charts ──────────────────────────────────────────────────────────────────
   const monthlyFlowData = useMemo(() => {
-    const CHART_YEAR = 2026;
+    const CHART_YEAR = now.getFullYear();
     const dataMap = {};
     for (let m = 1; m <= 12; m++) {
       const key = `${CHART_YEAR}-${String(m).padStart(2, '0')}`;
@@ -367,6 +346,22 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     });
   }, [transactions, budgets, monthlyIncomeGoal]);
 
+  // Annual Savings Tracker — derived from monthlyFlowData (must be after the useMemo above).
+  const completedMonthsData = monthlyFlowData.filter(d => !d.isFuture && !d.isCurrent && (d.income > 0 || d.expenses > 0));
+  const currentMonthFlowData = monthlyFlowData.find(d => d.isCurrent);
+  const annualSavings = completedMonthsData.reduce((s, d) => s + d.savings, 0)
+    + (currentMonthFlowData ? currentMonthFlowData.income - currentMonthFlowData.expenses : 0);
+  const completedCount = completedMonthsData.length + (currentMonthFlowData ? 1 : 0);
+  const avgMonthlySavings = completedCount > 0 ? annualSavings / completedCount : 0;
+  const projectedYearEnd = avgMonthlySavings * 12;
+  const monthsWithData = completedMonthsData.length;
+  const pacePct = (monthsWithData / 12) * 100;
+  const expectedPct = (now.getMonth() / 12) * 100;
+  const aheadOfPace = annualSavings > avgMonthlySavings * now.getMonth();
+  const savingsMonthLabel = completedMonthsData.length > 0
+    ? `${completedMonthsData[0].label.split(' ')[0]}–${completedMonthsData[completedMonthsData.length - 1].label.split(' ')[0]} + this month`
+    : 'This month only';
+
   const wealthData = useMemo(() => {
     const makeKey = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
     const nowKey = makeKey(now.getFullYear(), now.getMonth() + 1);
@@ -382,15 +377,15 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       else if (tx.type === 'expense') monthFlows[key] -= amt;
     });
 
-    // Estimate monthly savings from past 2026 months with positive net flow
-    const past2026 = Object.keys(monthFlows).filter(k => k.startsWith('2026-') && k < nowKey);
-    const posFlows = past2026.filter(k => monthFlows[k] > 0);
+    // Estimate monthly savings from past months of the current year with positive net flow
+    const pastThisYear = Object.keys(monthFlows).filter(k => k.startsWith(`${now.getFullYear()}-`) && k < nowKey);
+    const posFlows = pastThisYear.filter(k => monthFlows[k] > 0);
     const estSavings = posFlows.length > 0
       ? posFlows.reduce((s, k) => s + monthFlows[k], 0) / posFlows.length : 0;
 
     // Determine start key from range
     let startKey;
-    const projEndYear = Math.max(now.getFullYear(), 2026);
+    const projEndYear = now.getFullYear();
     if (wealthRange === 'YTD') {
       startKey = makeKey(now.getFullYear(), 1);
     } else if (wealthRange === 'ALL') {
@@ -554,7 +549,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     if (!data || data.isFuture) return;
     setViewMode('month');
     setViewMonth(data.month);
-    setViewYear(2026);
+    setViewYear(Number(data.key.split('-')[0]));
     setTimeout(() => spendingDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
@@ -955,7 +950,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       {/* Monthly Flow Chart */}
       <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-5 sm:mb-6">
-          <h3 className="text-sm font-bold uppercase text-gray-300">Monthly Flow — 2026</h3>
+          <h3 className="text-sm font-bold uppercase text-gray-300">Monthly Flow — {now.getFullYear()}</h3>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-gray-600 hidden sm:inline">Click a month to drill in · future = estimated</span>
             {editingIncomeGoal ? (
@@ -990,7 +985,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                 onClick={() => { setIncomeGoalInput(String(monthlyIncomeGoal || '')); setEditingIncomeGoal(true); }}
                 className="text-xs text-gray-600 hover:text-emerald-400 transition border border-neutral-800 hover:border-neutral-600 rounded px-2 py-0.5"
               >
-                {monthlyIncomeGoal > 0 ? `Est. income: AED ${monthlyIncomeGoal.toLocaleString()}/mo` : 'Set expected income →'}
+                {monthlyIncomeGoal > 0 ? `Est. income: ${fmt(monthlyIncomeGoal)}/mo` : 'Set expected income →'}
               </button>
             )}
           </div>
@@ -1115,14 +1110,14 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
           <div className="bg-neutral-950 border border-orange-900/40 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold uppercase text-gray-300">🤝 Loans Outstanding</h3>
-              <span className="text-orange-400 font-bold text-sm">AED {Math.round(totalOwed).toLocaleString()} owed to you</span>
+              <span className="text-orange-400 font-bold text-sm">{fmt(totalOwed)} owed to you</span>
             </div>
             <div className="space-y-2">
               {rows.map(([borrower, net]) => (
                 <div key={borrower} className="flex items-center justify-between bg-neutral-900 rounded-xl px-4 py-2.5">
                   <span className="text-sm text-gray-300 font-medium">{borrower}</span>
                   <span className={`text-sm font-mono font-semibold ${net > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>
-                    {net > 0 ? '+' : ''}AED {Math.round(Math.abs(net)).toLocaleString()}
+                    {net > 0 ? '+' : ''}{fmt(Math.abs(net))}
                     <span className="text-xs text-gray-500 ml-1">{net > 0 ? 'owes you' : 'repaid'}</span>
                   </span>
                 </div>
