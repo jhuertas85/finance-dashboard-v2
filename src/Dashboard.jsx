@@ -347,19 +347,19 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   }, [transactions, budgets, monthlyIncomeGoal]);
 
   // Annual Savings Tracker — derived from monthlyFlowData (must be after the useMemo above).
-  const completedMonthsData = monthlyFlowData.filter(d => !d.isFuture && !d.isCurrent && (d.income > 0 || d.expenses > 0));
-  const currentMonthFlowData = monthlyFlowData.find(d => d.isCurrent);
-  const annualSavings = completedMonthsData.reduce((s, d) => s + d.savings, 0)
-    + (currentMonthFlowData ? currentMonthFlowData.income - currentMonthFlowData.expenses : 0);
-  const completedCount = completedMonthsData.length + (currentMonthFlowData ? 1 : 0);
-  const avgMonthlySavings = completedCount > 0 ? annualSavings / completedCount : 0;
-  const projectedYearEnd = avgMonthlySavings * 12;
-  const monthsWithData = completedMonthsData.length;
-  const pacePct = (monthsWithData / 12) * 100;
-  const expectedPct = (now.getMonth() / 12) * 100;
-  const aheadOfPace = annualSavings > avgMonthlySavings * now.getMonth();
-  const savingsMonthLabel = completedMonthsData.length > 0
-    ? `${completedMonthsData[0].label.split(' ')[0]}–${completedMonthsData[completedMonthsData.length - 1].label.split(' ')[0]} + this month`
+  const savingCompletedMonths = monthlyFlowData.filter(d => !d.isFuture && !d.isCurrent && (d.income > 0 || d.expenses > 0));
+  const savingCurrentMonth = monthlyFlowData.find(d => d.isCurrent);
+  const annualSavings = savingCompletedMonths.reduce((s, d) => s + d.savings, 0)
+    + (savingCurrentMonth ? savingCurrentMonth.income - savingCurrentMonth.expenses : 0);
+  const savingCompletedCount = savingCompletedMonths.length + (savingCurrentMonth ? 1 : 0);
+  const savingAvgMonthly = savingCompletedCount > 0 ? annualSavings / savingCompletedCount : 0;
+  const projectedYearEnd = savingAvgMonthly * 12;
+  const savingMonthsWithData = savingCompletedMonths.length;
+  const savingPacePct = (savingMonthsWithData / 12) * 100;
+  const savingExpectedPct = (now.getMonth() / 12) * 100;
+  const savingAheadOfPace = annualSavings > savingAvgMonthly * now.getMonth();
+  const savingsMonthLabel = savingCompletedMonths.length > 0
+    ? `${savingCompletedMonths[0].label.split(' ')[0]}–${savingCompletedMonths[savingCompletedMonths.length - 1].label.split(' ')[0]} + this month`
     : 'This month only';
 
   const wealthData = useMemo(() => {
@@ -640,11 +640,11 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className={projectedYearEnd >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(projectedYearEnd)}</span>
           </div>
           <div className="relative w-full bg-gray-800 rounded-full h-2 mt-2">
-            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(pacePct, 100)}%` }} />
-            <div className="absolute top-0 bottom-0 w-0.5 rounded-full" style={{ left: `${Math.min(expectedPct, 99)}%`, backgroundColor: '#ffffff', opacity: 0.7 }} />
+            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(savingPacePct, 100)}%` }} />
+            <div className="absolute top-0 bottom-0 w-0.5 rounded-full" style={{ left: `${Math.min(savingExpectedPct, 99)}%`, backgroundColor: '#ffffff', opacity: 0.7 }} />
           </div>
-          <span className={`text-xs mt-1 block ${aheadOfPace ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {aheadOfPace ? '↑ Ahead of pace' : '↓ Behind pace'} {monthsWithData}/{12} months
+          <span className={`text-xs mt-1 block ${savingAheadOfPace ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {savingAheadOfPace ? '↑ Ahead of pace' : '↓ Behind pace'} {savingMonthsWithData}/{12} months
           </span>
         </div>
       </div>
