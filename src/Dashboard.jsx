@@ -294,7 +294,26 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
   const maxPeriodSpent = Math.max(...periodSpendingData.map(d => d.spent), 1);
   const totalPct = periodBudget > 0 ? (periodExpenses / periodBudget) * 100 : 0;
-  const annualSavings = 177691;
+  // Annual Savings Tracker — derived from real transaction data.
+  const currentYear = now.getFullYear();
+  // Completed months = past months with at least some income or expense recorded.
+  const completedMonthsData = monthlyFlowData.filter(d => !d.isFuture && !d.isCurrent && (d.income > 0 || d.expenses > 0));
+  const currentMonthData = monthlyFlowData.find(d => d.isCurrent);
+  // YTD: sum of completed months + current month's real transactions so far.
+  const annualSavings = completedMonthsData.reduce((s, d) => s + d.savings, 0)
+    + (currentMonthData ? currentMonthData.income - currentMonthData.expenses : 0);
+  const completedCount = completedMonthsData.length + (currentMonthData ? 1 : 0);
+  // Projected year-end: extrapolate avg monthly savings across 12 months.
+  const avgMonthlySavings = completedCount > 0 ? annualSavings / completedCount : 0;
+  const projectedYearEnd = avgMonthlySavings * 12;
+  // Progress bar: months with data vs 12, tick at current month.
+  const monthsWithData = completedMonthsData.length;
+  const pacePct = (monthsWithData / 12) * 100;
+  const expectedPct = ((now.getMonth()) / 12) * 100;
+  const aheadOfPace = annualSavings > (avgMonthlySavings * now.getMonth());
+  const savingsMonthLabel = completedMonthsData.length > 0
+    ? `${completedMonthsData[0].label.split(' ')[0]}–${completedMonthsData[completedMonthsData.length - 1].label.split(' ')[0]} + this month`
+    : 'This month only';
 
   // ─── Charts ──────────────────────────────────────────────────────────────────
   const monthlyFlowData = useMemo(() => {
@@ -620,16 +639,18 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <span className="text-lg">📅</span>
           </div>
           <div className="text-3xl font-bold text-white mb-1">{fmt(annualSavings)}</div>
-          <div className="text-xs text-gray-500">Jan–May real savings</div>
+          <div className="text-xs text-gray-500">{savingsMonthLabel} real savings</div>
           <div className="flex items-center justify-between text-xs text-gray-500 mt-3">
             <span>Projected year-end</span>
-            <span className="text-emerald-400">{fmt(230171)}</span>
+            <span className={projectedYearEnd >= 0 ? 'text-emerald-400' : 'text-red-400'}>{fmt(projectedYearEnd)}</span>
           </div>
           <div className="relative w-full bg-gray-800 rounded-full h-2 mt-2">
-            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(5 / 12) * 100}%` }} />
-            <div className="absolute top-0 bottom-0 w-0.5 rounded-full" style={{ left: `${(now.getMonth() / 12) * 100}%`, backgroundColor: '#ffffff', opacity: 0.7 }} />
+            <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(pacePct, 100)}%` }} />
+            <div className="absolute top-0 bottom-0 w-0.5 rounded-full" style={{ left: `${Math.min(expectedPct, 99)}%`, backgroundColor: '#ffffff', opacity: 0.7 }} />
           </div>
-          <span className="text-xs text-emerald-400 mt-1 block">↑ Ahead of pace 5/12 months</span>
+          <span className={`text-xs mt-1 block ${aheadOfPace ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {aheadOfPace ? '↑ Ahead of pace' : '↓ Behind pace'} {monthsWithData}/{12} months
+          </span>
         </div>
       </div>
 
