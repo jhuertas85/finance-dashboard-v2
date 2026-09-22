@@ -42,8 +42,8 @@ function calcByCategory(transactions, month, year) {
 }
 
 function spendBarColor(pct) {
-  if (pct > 85) return '#ef4444';
-  if (pct > 50) return '#f59e0b';
+  if (pct > 100) return '#ef4444';
+  if (pct > 60) return '#f59e0b';
   return '#10b981';
 }
 
@@ -616,7 +616,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             {totalMonthlyBudget > 0 && (
               <div className="h-full rounded-full transition-all" style={{
                 width: `${Math.min(spentPct, 100)}%`,
-                backgroundColor: spentPct > 100 ? '#ef4444' : spentPct > 75 ? '#f59e0b' : '#10b981',
+                backgroundColor: spentPct > 100 ? '#ef4444' : spentPct > 60 ? '#f59e0b' : '#10b981',
               }} />
             )}
             <div className="absolute top-0 bottom-0 w-0.5 rounded-full" style={{ left: `${dayProgress.pct}%`, backgroundColor: '#ffffff', opacity: 0.8 }} />
@@ -867,15 +867,15 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-semibold text-gray-400">Total vs Budget</span>
               <span className="text-xs font-mono">
-                <span className={totalPct > 85 ? 'text-red-400 font-bold' : 'text-white font-bold'}>{fmt(periodExpenses)}</span>
+                <span className={totalPct > 100 ? 'text-red-400 font-bold' : 'text-white font-bold'}>{fmt(periodExpenses)}</span>
                 <span className="text-gray-500"> / {fmt(periodBudget)}{'  '}</span>
-                <span className={`font-bold ${totalPct > 85 ? 'text-red-400' : totalPct > 50 ? 'text-amber-400' : 'text-emerald-400'}`}>{Math.round(totalPct)}%</span>
+                <span className={`font-bold ${totalPct > 100 ? 'text-red-400' : totalPct > 60 ? 'text-amber-400' : 'text-emerald-400'}`}>{Math.round(totalPct)}%</span>
               </span>
             </div>
             <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-all" style={{
                 width: `${Math.min(totalPct, 100)}%`,
-                backgroundColor: totalPct > 85 ? '#ef4444' : totalPct > 50 ? '#f59e0b' : '#10b981',
+                backgroundColor: totalPct > 100 ? '#ef4444' : totalPct > 60 ? '#f59e0b' : '#10b981',
               }} />
               <div className="absolute top-0 bottom-0 w-0.5 bg-white/70 rounded-full" style={{ left: `${Math.min(periodPacePct, 99)}%` }} />
             </div>
@@ -901,7 +901,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                       {fmt(item.spent)}
                       {item.budget > 0 && (
                         <span className="text-gray-600"> / {fmt(item.budget)}
-                          <span className={`ml-2 font-bold ${item.pct > 85 ? 'text-red-400' : item.pct > 50 ? 'text-amber-400' : 'text-gray-400'}`}>
+                          <span className={`ml-2 font-bold ${item.pct > 100 ? 'text-red-400' : item.pct > 60 ? 'text-amber-400' : 'text-gray-400'}`}>
                             {' '}{Math.round(item.pct)}%
                           </span>
                         </span>
@@ -940,9 +940,9 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         {/* Legend */}
         {sortedPeriodData.length > 0 && (
           <div className="flex gap-5 mt-4 pt-3 border-t border-neutral-800 text-xs text-gray-500">
-            <span><span className="text-emerald-400">●</span> &lt;50% budget</span>
-            <span><span className="text-amber-400">●</span> 50–85% budget</span>
-            <span><span className="text-red-400">●</span> &gt;85% budget</span>
+            <span><span className="text-emerald-400">●</span> &lt;60% budget</span>
+            <span><span className="text-amber-400">●</span> 60–100% budget</span>
+            <span><span className="text-red-400">●</span> &gt;100% over budget</span>
           </div>
         )}
       </div>
