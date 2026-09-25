@@ -29,7 +29,7 @@ function pctColor(pct) {
   return 'hsl(142, 60%, 62%)';
 }
 
-export default function BudgetGrid({ budgets, transactions, selectedCurrency = 'AED' }) {
+export default function BudgetGrid({ budgets, transactions, selectedCurrency = 'AED', onNavigateToTx }) {
   const now = new Date();
   const GRID_YEAR = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -76,11 +76,13 @@ export default function BudgetGrid({ budgets, transactions, selectedCurrency = '
     const current = month === null
       ? (getDefault(category)?.monthlyLimit ?? 0)
       : effective(category, month).amount;
+    const spent = month !== null ? (spending[`${category}:${month}`] ?? 0) : null;
     setModal({
       category,
       month,
       amount: String(current),
       reason: existing?.reason ?? '',
+      spent,
     });
   }
 
@@ -286,9 +288,23 @@ export default function BudgetGrid({ budgets, transactions, selectedCurrency = '
                 <h2 className="text-white font-bold text-sm">
                   {getCategoryEmoji(modal.category)} {modal.category}
                 </h2>
-                <p className="text-gray-500 text-xs mt-0.5">
-                  {modal.month === null ? 'Default (all months)' : `${MONTH_LABELS[modal.month - 1]} ${GRID_YEAR}`}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-gray-500 text-xs">
+                    {modal.month === null ? 'Default (all months)' : `${MONTH_LABELS[modal.month - 1]} ${GRID_YEAR}`}
+                  </p>
+                  {modal.month !== null && modal.spent != null && (
+                    <button
+                      onClick={() => {
+                        setModal(null);
+                        onNavigateToTx?.({ type: 'expense', category: modal.category, year: GRID_YEAR, month: modal.month, mode: 'month' });
+                      }}
+                      className="text-xs font-mono font-semibold text-amber-400 hover:text-amber-300 hover:underline transition"
+                      title="View transactions"
+                    >
+                      {fmtAmt(modal.spent, rate)} spent →
+                    </button>
+                  )}
+                </div>
               </div>
               <button onClick={() => setModal(null)} className="text-gray-400 hover:text-white text-lg">✕</button>
             </div>

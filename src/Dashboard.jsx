@@ -1131,7 +1131,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       })()}
 
       {/* Budget Overview Grid */}
-      <BudgetGrid budgets={budgets} transactions={transactions} selectedCurrency={selectedCurrency} />
+      <BudgetGrid budgets={budgets} transactions={transactions} selectedCurrency={selectedCurrency} onNavigateToTx={onNavigateToTx} />
 
       {/* Pay Credit Card Modal */}
       {payingCard && (
