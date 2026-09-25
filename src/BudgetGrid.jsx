@@ -13,17 +13,20 @@ function fmtAmt(aed, rate = 1) {
 }
 
 // Green < 60%, yellow 60–100%, red > 100%
+// 0-50%: light green · 50-75%: green · 75-100%: yellow · ≥100%: red (intensifies)
 function pctColor(pct) {
   if (pct >= 100) {
     const over = Math.min((pct - 100) / 80, 1);
     return `hsl(0, ${70 + over * 25}%, ${50 - over * 12}%)`;
   }
-  if (pct >= 60) {
-    const t = (pct - 60) / 40;
-    return `hsl(${Math.round(38 - t * 38)}, 90%, 50%)`;
+  if (pct >= 75) {
+    const t = (pct - 75) / 25;
+    return `hsl(${Math.round(45 - t * 7)}, 95%, 50%)`;
   }
-  const t = pct / 60;
-  return `hsl(${Math.round(142 - t * 90)}, 80%, ${Math.round(48 - t * 8)}%)`;
+  if (pct >= 50) {
+    return 'hsl(142, 72%, 42%)';
+  }
+  return 'hsl(142, 60%, 62%)';
 }
 
 export default function BudgetGrid({ budgets, transactions, selectedCurrency = 'AED' }) {
