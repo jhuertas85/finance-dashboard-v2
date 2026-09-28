@@ -56,6 +56,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   const [viewMode, setViewMode] = useState('month');   // 'month' | 'ytd' | 'year'
   const [displayMode, setDisplayMode] = useState('budget'); // 'budget' | 'absolute'
   const [payingCard, setPayingCard] = useState(null);
+  const [bucketsExpanded, setBucketsExpanded] = useState(false);
   const [wealthRange, setWealthRange] = useState('12M');
   const [monthlyIncomeGoal, setMonthlyIncomeGoal] = useState(() => {
     const stored = localStorage.getItem('monthlyIncomeGoal');
@@ -655,135 +656,175 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
         {/* Capital */}
-        <div className="bg-purple-950/20 border border-purple-800/50 rounded-2xl p-3 sm:p-5 flex flex-col">
+        <div
+          className={`bg-purple-950/20 border border-purple-800/50 rounded-2xl p-3 sm:p-5 flex flex-col ${!bucketsExpanded ? 'cursor-pointer hover:border-purple-700/70 transition' : ''}`}
+          onClick={!bucketsExpanded ? () => setBucketsExpanded(true) : undefined}
+        >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-purple-900/50 rounded-lg p-1.5">🏦</span>
             <span className="text-xs font-bold uppercase text-gray-400">Capital</span>
-          </div>
-          <div className="text-2xl font-bold text-cyan-400 mb-4">{fmt(displayCapital)}</div>
-          <div className="space-y-1.5 flex-1">
-            {isCurrentMonth ? capitalAccounts.map(acc => (
-              <div key={acc.id} className="flex justify-between text-xs gap-2">
-                <span className="text-gray-400 truncate">{acc.name}</span>
-                <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
-              </div>
-            )) : (
-              <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(viewYear, viewMonth)}</div>
+            {bucketsExpanded && (
+              <button
+                onClick={e => { e.stopPropagation(); setBucketsExpanded(false); }}
+                className="ml-auto text-gray-600 hover:text-gray-300 text-sm leading-none transition"
+                title="Collapse"
+              >▴</button>
             )}
           </div>
-          <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-purple-900/40">Liquid · immediately available</div>
+          <div className={`text-2xl font-bold text-cyan-400 ${bucketsExpanded ? 'mb-4' : 'mb-0'}`}>{fmt(displayCapital)}</div>
+          {bucketsExpanded && (
+            <>
+              <div className="space-y-1.5 flex-1">
+                {isCurrentMonth ? capitalAccounts.map(acc => (
+                  <div key={acc.id} className="flex justify-between text-xs gap-2">
+                    <span className="text-gray-400 truncate">{acc.name}</span>
+                    <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
+                  </div>
+                )) : (
+                  <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(viewYear, viewMonth)}</div>
+                )}
+              </div>
+              <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-purple-900/40">Liquid · immediately available</div>
+            </>
+          )}
         </div>
 
         {/* Assets — Usable */}
-        <div className="bg-blue-950/20 border border-blue-800/50 rounded-2xl p-3 sm:p-5 flex flex-col">
+        <div
+          className={`bg-blue-950/20 border border-blue-800/50 rounded-2xl p-3 sm:p-5 flex flex-col ${!bucketsExpanded ? 'cursor-pointer hover:border-blue-700/70 transition' : ''}`}
+          onClick={!bucketsExpanded ? () => setBucketsExpanded(true) : undefined}
+        >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-blue-900/50 rounded-lg p-1.5">📊</span>
             <span className="text-xs font-bold uppercase text-gray-400">Assets — Usable</span>
+            {bucketsExpanded && (
+              <button
+                onClick={e => { e.stopPropagation(); setBucketsExpanded(false); }}
+                className="ml-auto text-gray-600 hover:text-gray-300 text-sm leading-none transition"
+                title="Collapse"
+              >▴</button>
+            )}
           </div>
-          <div className="text-2xl font-bold text-blue-400 mb-4">{fmt(displayUsable)}</div>
-          <div className="space-y-1.5 flex-1">
-            {(() => {
-              // Current month: live balances + % delta vs previous month's snapshot.
-              // Historical: snapshot account rows only — no comparison (comparing past to future is misleading).
-              if (isCurrentMonth) {
-                const refSnap = snapshotByKey[prevKey] ?? latestSnapBefore(prevKey);
-                return usableAccounts.map(acc => {
-                  const snapAcc = refSnap?.usableAccounts?.find(sa => sa.id === acc.id);
-                  const currentAED = toAED(acc.currentBalance, acc.currency);
-                  const snapAED = snapAcc ? toAED(snapAcc.balance, snapAcc.currency) : null;
-                  const pct = (snapAED !== null && snapAED !== 0) ? ((currentAED - snapAED) / snapAED) * 100 : null;
-                  return (
-                    <div key={acc.id} className="flex justify-between text-xs gap-2 items-center">
-                      <span className="text-gray-400 truncate">{acc.name}</span>
-                      <span className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-gray-200 font-mono">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
-                        {pct !== null && Math.abs(pct) > 0.1 && (
-                          <span className={pct > 0 ? 'text-emerald-400' : 'text-red-400'}>
-                            {pct > 0 ? '+' : ''}{pct.toFixed(1)}%
+          <div className={`text-2xl font-bold text-blue-400 ${bucketsExpanded ? 'mb-4' : 'mb-0'}`}>{fmt(displayUsable)}</div>
+          {bucketsExpanded && (
+            <>
+              <div className="space-y-1.5 flex-1">
+                {(() => {
+                  if (isCurrentMonth) {
+                    const refSnap = snapshotByKey[prevKey] ?? latestSnapBefore(prevKey);
+                    return usableAccounts.map(acc => {
+                      const snapAcc = refSnap?.usableAccounts?.find(sa => sa.id === acc.id);
+                      const currentAED = toAED(acc.currentBalance, acc.currency);
+                      const snapAED = snapAcc ? toAED(snapAcc.balance, snapAcc.currency) : null;
+                      const pct = (snapAED !== null && snapAED !== 0) ? ((currentAED - snapAED) / snapAED) * 100 : null;
+                      return (
+                        <div key={acc.id} className="flex justify-between text-xs gap-2 items-center">
+                          <span className="text-gray-400 truncate">{acc.name}</span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-gray-200 font-mono">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
+                            {pct !== null && Math.abs(pct) > 0.1 && (
+                              <span className={pct > 0 ? 'text-emerald-400' : 'text-red-400'}>
+                                {pct > 0 ? '+' : ''}{pct.toFixed(1)}%
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
+                        </div>
+                      );
+                    });
+                  }
+                  const snap = snapshotByKey[viewKey] ?? nearestSnap(viewKey);
+                  const snapAccounts = snap?.usableAccounts ?? [];
+                  if (snapAccounts.length === 0) {
+                    return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(snap ? parseInt(snap.id.split('-')[0]) : viewYear, snap ? parseInt(snap.id.split('-')[1]) : viewMonth)}</div>;
+                  }
+                  return snapAccounts.map(sa => (
+                    <div key={sa.id} className="flex justify-between text-xs gap-2 items-center">
+                      <span className="text-gray-400 truncate">{sa.name}</span>
+                      <span className="text-gray-200 font-mono shrink-0">{sa.currency} {sa.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                     </div>
-                  );
-                });
-              }
-              // Historical month — show snapshot values, no delta arrows.
-              const snap = snapshotByKey[viewKey] ?? nearestSnap(viewKey);
-              const snapAccounts = snap?.usableAccounts ?? [];
-              if (snapAccounts.length === 0) {
-                return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(snap ? parseInt(snap.id.split('-')[0]) : viewYear, snap ? parseInt(snap.id.split('-')[1]) : viewMonth)}</div>;
-              }
-              return snapAccounts.map(sa => (
-                <div key={sa.id} className="flex justify-between text-xs gap-2 items-center">
-                  <span className="text-gray-400 truncate">{sa.name}</span>
-                  <span className="text-gray-200 font-mono shrink-0">{sa.currency} {sa.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
-                </div>
-              ));
-            })()}
-          </div>
-          <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-blue-900/40">Sellable within days</div>
+                  ));
+                })()}
+              </div>
+              <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-blue-900/40">Sellable within days</div>
+            </>
+          )}
         </div>
 
         {/* Assets — Future */}
-        <div className="bg-neutral-950 border border-neutral-700 rounded-2xl p-3 sm:p-5 flex flex-col">
+        <div
+          className={`bg-neutral-950 border border-neutral-700 rounded-2xl p-3 sm:p-5 flex flex-col ${!bucketsExpanded ? 'cursor-pointer hover:border-neutral-600 transition' : ''}`}
+          onClick={!bucketsExpanded ? () => setBucketsExpanded(true) : undefined}
+        >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-neutral-800 rounded-lg p-1.5">🔒</span>
             <span className="text-xs font-bold uppercase text-gray-400">Assets — Future</span>
+            {bucketsExpanded && (
+              <button
+                onClick={e => { e.stopPropagation(); setBucketsExpanded(false); }}
+                className="ml-auto text-gray-600 hover:text-gray-300 text-sm leading-none transition"
+                title="Collapse"
+              >▴</button>
+            )}
           </div>
-          <div className="text-2xl font-bold text-emerald-400 mb-1">{fmt(displayFuture)}</div>
-          {isCurrentMonth && (
+          <div className={`text-2xl font-bold text-emerald-400 ${bucketsExpanded && isCurrentMonth ? 'mb-1' : bucketsExpanded ? 'mb-4' : 'mb-0'}`}>{fmt(displayFuture)}</div>
+          {bucketsExpanded && isCurrentMonth && (
             <div className="text-xs text-gray-500 mb-4">gross {fmt(futureAssetsTotal)} – {fmt(futureLiabilitiesTotal)}</div>
           )}
-          <div className="space-y-1.5 flex-1">
-            {isCurrentMonth ? (
-              futureAssetAccounts.map(acc => (
-                <div key={acc.id} className="flex justify-between text-xs gap-2">
-                  <span className="text-gray-400 truncate">{acc.name}</span>
-                  <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
-                </div>
-              ))
-            ) : (() => {
-              const snap = snapshotByKey[viewKey] ?? nearestSnap(viewKey);
-              const snapYear = snap ? parseInt(snap.id.split('-')[0]) : viewYear;
-              const snapMonth = snap ? parseInt(snap.id.split('-')[1]) : viewMonth;
-              return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(snapYear, snapMonth)}</div>;
-            })()}
-          </div>
-          {futureLiabilityAccounts.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-neutral-800">
-              <p className="text-xs text-gray-600 mb-1.5">Outstanding contributions:</p>
-              <div className="space-y-1">
-                {futureLiabilityAccounts.map(acc => (
-                  <div key={acc.id} className="flex justify-between text-xs gap-2">
-                    <span className="text-gray-600 truncate">{acc.name}</span>
-                    <span className="text-red-500/70 font-mono shrink-0">–{fmtFull(Math.abs(toAED(acc.currentBalance, acc.currency)))}</span>
-                  </div>
-                ))}
+          {bucketsExpanded && (
+            <>
+              <div className="space-y-1.5 flex-1">
+                {isCurrentMonth ? (
+                  futureAssetAccounts.map(acc => (
+                    <div key={acc.id} className="flex justify-between text-xs gap-2">
+                      <span className="text-gray-400 truncate">{acc.name}</span>
+                      <span className="text-gray-200 font-mono shrink-0">{fmtAccFull(acc.currentBalance, acc.currency)}</span>
+                    </div>
+                  ))
+                ) : (() => {
+                  const snap = snapshotByKey[viewKey] ?? nearestSnap(viewKey);
+                  const snapYear = snap ? parseInt(snap.id.split('-')[0]) : viewYear;
+                  const snapMonth = snap ? parseInt(snap.id.split('-')[1]) : viewMonth;
+                  return <div className="text-xs text-gray-600">Snapshot from {getMonthLabel(snapYear, snapMonth)}</div>;
+                })()}
               </div>
-            </div>
+              {futureLiabilityAccounts.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-neutral-800">
+                  <p className="text-xs text-gray-600 mb-1.5">Outstanding contributions:</p>
+                  <div className="space-y-1">
+                    {futureLiabilityAccounts.map(acc => (
+                      <div key={acc.id} className="flex justify-between text-xs gap-2">
+                        <span className="text-gray-600 truncate">{acc.name}</span>
+                        <span className="text-red-500/70 font-mono shrink-0">–{fmtFull(Math.abs(toAED(acc.currentBalance, acc.currency)))}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-neutral-800">Locked · long-term · contributions reduce as you pay</div>
+            </>
           )}
-          <div className="text-xs text-gray-600 mt-4 pt-3 border-t border-neutral-800">Locked · long-term · contributions reduce as you pay</div>
         </div>
 
         {/* Credit Cards */}
-        <div className="bg-red-950/10 border border-red-900/40 rounded-2xl p-3 sm:p-5 flex flex-col">
+        <div
+          className={`bg-red-950/10 border border-red-900/40 rounded-2xl p-3 sm:p-5 flex flex-col ${!bucketsExpanded ? 'cursor-pointer hover:border-red-900/60 transition' : ''}`}
+          onClick={!bucketsExpanded ? () => setBucketsExpanded(true) : undefined}
+        >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-red-900/30 rounded-lg p-1.5">💳</span>
             <span className="text-xs font-bold uppercase text-gray-400">Credit Cards</span>
+            {bucketsExpanded && (
+              <button
+                onClick={e => { e.stopPropagation(); setBucketsExpanded(false); }}
+                className="ml-auto text-gray-600 hover:text-gray-300 text-sm leading-none transition"
+                title="Collapse"
+              >▴</button>
+            )}
           </div>
-          <div className="text-2xl font-bold text-red-400 mb-4">{fmt(creditCardTotal)}</div>
-          <div className="space-y-2 flex-1">
-            {creditCardAccounts.map(acc => (
-              <div key={acc.id} className="flex justify-between items-center text-xs gap-2">
-                <span className="text-gray-400 truncate">💳 {acc.name}</span>
-                <span className={acc.currentBalance < 0 ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>
-                  {fmtAccFull(acc.currentBalance, acc.currency)}
-                </span>
-              </div>
-            ))}
-          </div>
+          <div className={`text-2xl font-bold text-red-400 ${bucketsExpanded ? 'mb-4' : 'mb-2'}`}>{fmt(creditCardTotal)}</div>
+          {/* Pay buttons always visible */}
           {cardsWithPending.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div className={`space-y-2 ${bucketsExpanded ? 'mb-4' : ''}`} onClick={e => e.stopPropagation()}>
               {cardsWithPending.map(acc => {
                 const pendingCount = transactions.filter(tx =>
                   (tx.fromAccount === acc.id || tx.fromAccount === acc.name) && tx.reconciled === false
@@ -796,6 +837,18 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
                   </button>
                 );
               })}
+            </div>
+          )}
+          {bucketsExpanded && (
+            <div className="space-y-2 flex-1">
+              {creditCardAccounts.map(acc => (
+                <div key={acc.id} className="flex justify-between items-center text-xs gap-2">
+                  <span className="text-gray-400 truncate">💳 {acc.name}</span>
+                  <span className={acc.currentBalance < 0 ? 'text-red-400 font-mono' : 'text-emerald-400 font-mono'}>
+                    {fmtAccFull(acc.currentBalance, acc.currency)}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>
