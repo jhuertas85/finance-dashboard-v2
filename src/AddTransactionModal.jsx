@@ -739,22 +739,27 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
               const unpaid  = recurringBills.filter(b => !paidIds.has(b.id));
 
               function daysUntilDue(bill) {
-                const day = bill.dayOfMonth ?? bill.dueDay;
-                if (day != null) {
+                const day = bill.dayOfMonth ?? bill.dueDay ?? bill.day;
+                if (day != null && !isNaN(parseInt(day))) {
                   const dayNum = parseInt(day);
                   if (isBillPaid(bill)) return dayNum - todayDay;
-                  const billName = (bill.name || '').toLowerCase().trim();
-                  const lastPaymentTx = [...transactions]
-                    .filter(tx => {
-                      if (tx.type !== 'expense') return false;
-                      if (tx.recurringBillId === bill.id) return true;
-                      return (tx.description || '').toLowerCase().trim() === billName;
-                    })
-                    .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-                  if (lastPaymentTx) {
-                    const lastPaid = new Date(lastPaymentTx.date);
-                    const nextDue = new Date(lastPaid.getFullYear(), lastPaid.getMonth() + 1, dayNum);
-                    return Math.floor((nextDue - now) / 86400000);
+                  if (todayDay >= dayNum) return dayNum - todayDay; // past due this month
+                  // Before this month's due date — check if last month was paid
+                  const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                  const prevEnd   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+                  const billName  = (bill.name || '').toLowerCase().trim();
+                  const paidPrev  = transactions.some(tx => {
+                    if (tx.type !== 'expense') return false;
+                    const d = new Date(tx.date);
+                    if (d < prevStart || d > prevEnd) return false;
+                    if (tx.recurringBillId === bill.id) return true;
+                    const desc  = (tx.description || '').toLowerCase().trim();
+                    const notes = (tx.notes || '').toLowerCase();
+                    return desc === billName || notes.includes(billName);
+                  });
+                  if (!paidPrev) {
+                    const lastDue = new Date(now.getFullYear(), now.getMonth() - 1, dayNum);
+                    return Math.floor((lastDue - now) / 86400000); // negative → overdue
                   }
                   return dayNum - todayDay;
                 }
