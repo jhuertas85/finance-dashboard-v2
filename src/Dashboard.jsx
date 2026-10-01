@@ -535,34 +535,46 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     return thisMonthBillTx.some(tx => (tx.description || '').toLowerCase().trim() === name);
   }
 
+  // prev-month window for "was this bill paid last month?" check
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthEnd   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+  function wasPaidInWindow(bill, from, to) {
+    const billName = (bill.name || '').toLowerCase().trim();
+    return transactions.some(tx => {
+      if (tx.type !== 'expense') return false;
+      const d = new Date(tx.date);
+      if (d < from || d > to) return false;
+      if (tx.recurringBillId === bill.id) return true;
+      const txDesc = (tx.description || '').toLowerCase().trim();
+      const txNotes = (tx.notes || '').toLowerCase();
+      return txDesc === billName || txNotes.includes(billName);
+    });
+  }
+
   const recurringBillsData = recurringBills.map(bill => {
-    const day = bill.dayOfMonth ?? bill.dueDay;
+    // Support all possible field names for the recurring day
+    const day = bill.dayOfMonth ?? bill.dueDay ?? bill.day;
     const isPaid = isBillRegisteredThisMonth(bill);
-    if (day != null) {
+
+    if (day != null && !isNaN(parseInt(day))) {
       const dayNum = parseInt(day);
-      if (isPaid) {
-        return { ...bill, isPaid: true, daysUntilDue: dayNum - now.getDate() };
+      if (isPaid) return { ...bill, isPaid: true, daysUntilDue: dayNum - now.getDate() };
+
+      if (now.getDate() >= dayNum) {
+        // Due date already passed this month — straightforward overdue
+        return { ...bill, isPaid: false, daysUntilDue: dayNum - now.getDate() };
       }
-      const billName = (bill.name || '').toLowerCase().trim();
-      const candidates = transactions.filter(tx => tx.type === 'expense');
-      const byId = candidates.filter(tx => tx.recurringBillId === bill.id);
-      const byName = candidates.filter(tx => (tx.description || '').toLowerCase().trim() === billName);
-      // DEBUG
-      if (bill.name && bill.name.toLowerCase().includes('du')) {
-        console.log('[DU DEBUG]', { billId: bill.id, billName, day, isPaid, byIdCount: byId.length, byNameCount: byName.length, byIdDates: byId.map(t=>t.date), byNameDates: byName.map(t=>t.date) });
-      }
-      const lastPaymentTx = [...byId, ...byName].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-      if (lastPaymentTx) {
-        const lastPaid = new Date(lastPaymentTx.date);
-        const nextDue = new Date(lastPaid.getFullYear(), lastPaid.getMonth() + 1, dayNum);
-        return { ...bill, isPaid: false, daysUntilDue: Math.floor((nextDue - now) / 86400000) };
+
+      // Before this month's due date — check if last month was paid
+      const paidLastMonth = wasPaidInWindow(bill, prevMonthStart, prevMonthEnd);
+      if (!paidLastMonth) {
+        const lastDue = new Date(prevMonthStart.getFullYear(), prevMonthStart.getMonth(), dayNum);
+        return { ...bill, isPaid: false, daysUntilDue: Math.floor((lastDue - now) / 86400000) };
       }
       return { ...bill, isPaid: false, daysUntilDue: dayNum - now.getDate() };
     }
-    // DEBUG for bills with no day field
-    if (bill.name && bill.name.toLowerCase().includes('du')) {
-      console.log('[DU DEBUG no-day]', { billId: bill.id, billName: bill.name, day, dayOfMonth: bill.dayOfMonth, dueDay: bill.dueDay, dueDate: bill.dueDate });
-    }
+
     const daysUntilDue = bill.dueDate ? Math.ceil((new Date(bill.dueDate) - now) / 86400000) : null;
     return { ...bill, isPaid, daysUntilDue };
   });
