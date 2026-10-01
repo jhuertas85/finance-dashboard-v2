@@ -538,11 +538,40 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     );
   }
 
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthBillTx = transactions.filter(tx => {
+    const d = new Date(tx.date);
+    return d.getFullYear() === prevMonthDate.getFullYear() && d.getMonth() === prevMonthDate.getMonth() && tx.type === 'expense';
+  });
+  const prevMonthBillIds = new Set(prevMonthBillTx.map(tx => tx.recurringBillId).filter(Boolean));
+  function isBillRegisteredPrevMonth(bill) {
+    if (prevMonthBillIds.has(bill.id)) return true;
+    const name = (bill.name || '').toLowerCase().trim();
+    return prevMonthBillTx.some(tx =>
+      tx.notes === 'Recurring bill' &&
+      (tx.description || '').toLowerCase().trim() === name
+    );
+  }
+
   const recurringBillsData = recurringBills.map(bill => {
     const day = bill.dayOfMonth ?? bill.dueDay;
-    const daysUntilDue = day != null
-      ? parseInt(day) - now.getDate()
-      : bill.dueDate ? Math.ceil((new Date(bill.dueDate) - now) / 86400000) : null;
+    if (day != null) {
+      const dayNum = parseInt(day);
+      if (now.getDate() >= dayNum) {
+        // Due date already passed (or today) this month
+        return { ...bill, isPaid: isBillRegisteredThisMonth(bill), daysUntilDue: dayNum - now.getDate() };
+      }
+      // Due date hasn't arrived yet this month — check if previous month was paid
+      if (!isBillRegisteredPrevMonth(bill)) {
+        // Previous month was skipped — overdue; allow this-month payment to clear it
+        const lastDue = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), dayNum);
+        const daysSince = Math.floor((now - lastDue) / 86400000);
+        return { ...bill, isPaid: isBillRegisteredThisMonth(bill), daysUntilDue: -daysSince };
+      }
+      // Previous month was paid — next due is later this month
+      return { ...bill, isPaid: false, daysUntilDue: dayNum - now.getDate() };
+    }
+    const daysUntilDue = bill.dueDate ? Math.ceil((new Date(bill.dueDate) - now) / 86400000) : null;
     return { ...bill, isPaid: isBillRegisteredThisMonth(bill), daysUntilDue };
   });
   const overdueBills = recurringBillsData.filter(b => !b.isPaid && b.daysUntilDue != null && b.daysUntilDue < 0);
