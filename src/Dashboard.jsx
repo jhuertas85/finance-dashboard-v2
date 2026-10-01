@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 import {
   XAxis, YAxis, CartesianGrid,
@@ -162,17 +162,22 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     const prevM = now.getMonth() === 0 ? 12 : now.getMonth(); // e.g. Sep(8) → Aug(8 as 1-indexed)
     const prevY = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
     const prevMonthKey = `${prevY}-${String(prevM).padStart(2, '0')}`;
-    if (snapshotByKey[prevMonthKey]) return;
+    const existingSnap = snapshotByKey[prevMonthKey];
+    const accountsPayload = usableAccounts.map(a => ({
+      id: a.id, name: a.name, balance: a.currentBalance, currency: a.currency,
+    }));
+    if (existingSnap) {
+      // Backfill per-account breakdown if missing from an older snapshot format
+      if (!existingSnap.usableAccounts) {
+        updateDoc(doc(db, 'networth_snapshots', prevMonthKey), { usableAccounts: accountsPayload }).catch(() => {});
+      }
+      return;
+    }
     setDoc(doc(db, 'networth_snapshots', prevMonthKey), {
       date: now.toISOString().slice(0, 10),
       usable: Math.round(usableTotal),
       future: Math.round(futureAssetsTotal - futureLiabilitiesTotal),
-      usableAccounts: usableAccounts.map(a => ({
-        id: a.id,
-        name: a.name,
-        balance: a.currentBalance,
-        currency: a.currency,
-      })),
+      usableAccounts: accountsPayload,
     }).catch(() => {});
   }, [accounts, snapshotByKey]);
 
