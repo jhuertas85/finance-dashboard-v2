@@ -751,7 +751,8 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                     if (tx.type !== 'expense') return false;
                     const d = new Date(tx.date);
                     if (d < prevStart || d > prevEnd) return false;
-                    if (tx.recurringBillId === bill.id) return true;
+                    // Description/notes only — recurringBillId can be accidentally set on
+                    // unrelated transactions (e.g. imported "Dubai Taxi" linked to bill_du)
                     const desc  = (tx.description || '').toLowerCase().trim();
                     const notes = (tx.notes || '').toLowerCase();
                     return desc === billName || notes.includes(billName);

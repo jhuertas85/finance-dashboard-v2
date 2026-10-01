@@ -550,7 +550,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       if (tx.type !== 'expense') return false;
       const d = new Date(tx.date);
       if (d < from || d > to) return false;
-      if (tx.recurringBillId === bill.id) return true;
+      // Use description/notes only — recurringBillId can be accidentally set on
+      // unrelated transactions (e.g. imported "Dubai Taxi" linked to bill_du)
       const txDesc = (tx.description || '').toLowerCase().trim();
       const txNotes = (tx.notes || '').toLowerCase();
       return txDesc === billName || txNotes.includes(billName);
