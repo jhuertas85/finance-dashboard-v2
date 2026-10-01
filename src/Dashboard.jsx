@@ -690,8 +690,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* Capital */}
         <div
-          className={`bg-purple-950/20 border border-purple-800/50 rounded-2xl p-3 sm:p-5 flex flex-col ${!bucketsExpanded ? 'cursor-pointer hover:border-purple-700/70 transition' : ''}`}
-          onClick={!bucketsExpanded ? () => setBucketsExpanded(true) : undefined}
+          className="bg-purple-950/20 border border-purple-800/50 rounded-2xl p-3 sm:p-5 flex flex-col cursor-pointer hover:border-purple-700/70 transition"
+          onClick={() => setBucketsExpanded(b => !b)}
         >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-purple-900/50 rounded-lg p-1.5">🏦</span>
@@ -724,8 +724,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* Assets — Usable */}
         <div
-          className={`bg-blue-950/20 border border-blue-800/50 rounded-2xl p-3 sm:p-5 flex flex-col ${!bucketsExpanded ? 'cursor-pointer hover:border-blue-700/70 transition' : ''}`}
-          onClick={!bucketsExpanded ? () => setBucketsExpanded(true) : undefined}
+          className="bg-blue-950/20 border border-blue-800/50 rounded-2xl p-3 sm:p-5 flex flex-col cursor-pointer hover:border-blue-700/70 transition"
+          onClick={() => setBucketsExpanded(b => !b)}
         >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-blue-900/50 rounded-lg p-1.5">📊</span>
@@ -785,8 +785,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* Assets — Future */}
         <div
-          className={`bg-neutral-950 border border-neutral-700 rounded-2xl p-3 sm:p-5 flex flex-col ${!bucketsExpanded ? 'cursor-pointer hover:border-neutral-600 transition' : ''}`}
-          onClick={!bucketsExpanded ? () => setBucketsExpanded(true) : undefined}
+          className="bg-neutral-950 border border-neutral-700 rounded-2xl p-3 sm:p-5 flex flex-col cursor-pointer hover:border-neutral-600 transition"
+          onClick={() => setBucketsExpanded(b => !b)}
         >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-neutral-800 rounded-lg p-1.5">🔒</span>
@@ -840,8 +840,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
 
         {/* Credit Cards */}
         <div
-          className={`bg-red-950/10 border border-red-900/40 rounded-2xl p-3 sm:p-5 flex flex-col ${!bucketsExpanded ? 'cursor-pointer hover:border-red-900/60 transition' : ''}`}
-          onClick={!bucketsExpanded ? () => setBucketsExpanded(true) : undefined}
+          className="bg-red-950/10 border border-red-900/40 rounded-2xl p-3 sm:p-5 flex flex-col cursor-pointer hover:border-red-900/60 transition"
+          onClick={() => setBucketsExpanded(b => !b)}
         >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-base bg-red-900/30 rounded-lg p-1.5">💳</span>
