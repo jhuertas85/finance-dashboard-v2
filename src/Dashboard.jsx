@@ -561,12 +561,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       const dayNum = parseInt(day);
       if (isPaid) return { ...bill, isPaid: true, daysUntilDue: dayNum - now.getDate() };
 
-      if (now.getDate() >= dayNum) {
-        // Due date already passed this month — straightforward overdue
-        return { ...bill, isPaid: false, daysUntilDue: dayNum - now.getDate() };
-      }
-
-      // Before this month's due date — check if last month was paid
+      // Always check last month — if missed, bill has been overdue since then
       const paidLastMonth = wasPaidInWindow(bill, prevMonthStart, prevMonthEnd);
       if (!paidLastMonth) {
         const lastDue = new Date(prevMonthStart.getFullYear(), prevMonthStart.getMonth(), dayNum);

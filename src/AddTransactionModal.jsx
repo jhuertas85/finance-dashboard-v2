@@ -741,10 +741,9 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
               function daysUntilDue(bill) {
                 const day = bill.dayOfMonth ?? bill.dueDay ?? bill.day;
                 if (day != null && !isNaN(parseInt(day))) {
-                  const dayNum = parseInt(day);
+                  const dayNum   = parseInt(day);
                   if (isBillPaid(bill)) return dayNum - todayDay;
-                  if (todayDay >= dayNum) return dayNum - todayDay; // past due this month
-                  // Before this month's due date — check if last month was paid
+                  // Always check last month — if missed, bill has been overdue since then
                   const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                   const prevEnd   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
                   const billName  = (bill.name || '').toLowerCase().trim();
