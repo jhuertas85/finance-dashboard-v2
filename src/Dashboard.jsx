@@ -532,10 +532,7 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
   function isBillRegisteredThisMonth(bill) {
     if (thisMonthBillIds.has(bill.id)) return true;
     const name = (bill.name || '').toLowerCase().trim();
-    return thisMonthBillTx.some(tx =>
-      tx.notes === 'Recurring bill' &&
-      (tx.description || '').toLowerCase().trim() === name
-    );
+    return thisMonthBillTx.some(tx => (tx.description || '').toLowerCase().trim() === name);
   }
 
   const recurringBillsData = recurringBills.map(bill => {
@@ -552,7 +549,8 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
         .filter(tx => {
           if (tx.type !== 'expense') return false;
           if (tx.recurringBillId === bill.id) return true;
-          return tx.notes === 'Recurring bill' && (tx.description || '').toLowerCase().trim() === billName;
+          // Fallback: match by description alone — catches manual entries and bills whose ID changed
+          return (tx.description || '').toLowerCase().trim() === billName;
         })
         .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
       if (lastPaymentTx) {
@@ -567,16 +565,6 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     const daysUntilDue = bill.dueDate ? Math.ceil((new Date(bill.dueDate) - now) / 86400000) : null;
     return { ...bill, isPaid, daysUntilDue };
   });
-  // DEBUG — remove after diagnosing Du
-  console.log('[RecurringBills debug]', recurringBillsData.map(b => {
-    const day = b.dayOfMonth ?? b.dueDay;
-    const billName = (b.name || '').toLowerCase().trim();
-    const lastTx = [...transactions]
-      .filter(tx => tx.type === 'expense' && (tx.recurringBillId === b.id || (tx.notes === 'Recurring bill' && (tx.description || '').toLowerCase().trim() === billName)))
-      .sort((a, b2) => new Date(b2.date) - new Date(a.date))[0];
-    return { name: b.name, day, isPaid: b.isPaid, daysUntilDue: b.daysUntilDue, lastTxDate: lastTx?.date ?? 'none', lastTxId: lastTx?.id ?? 'none' };
-  }));
-
   const overdueBills = recurringBillsData.filter(b => !b.isPaid && b.daysUntilDue != null && b.daysUntilDue < 0);
   const dueSoonBills = recurringBillsData.filter(b => !b.isPaid && b.daysUntilDue != null && b.daysUntilDue >= 0 && b.daysUntilDue <= 2);
 

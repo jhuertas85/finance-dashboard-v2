@@ -350,10 +350,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
   function isBillPaid(bill) {
     if (thisMonthBillIds.has(bill.id)) return true;
     const name = (bill.name || '').toLowerCase().trim();
-    return thisMonthTx.some(tx =>
-      tx.notes === 'Recurring bill' &&
-      (tx.description || '').toLowerCase().trim() === name
-    );
+    return thisMonthTx.some(tx => (tx.description || '').toLowerCase().trim() === name);
   }
 
   function reset() { setDescription(''); setAmountExpr(''); setAmountToExpr(''); setNotes(''); setBorrower(''); setError(''); setLinkedDebtId(''); }
@@ -751,7 +748,7 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
                     .filter(tx => {
                       if (tx.type !== 'expense') return false;
                       if (tx.recurringBillId === bill.id) return true;
-                      return tx.notes === 'Recurring bill' && (tx.description || '').toLowerCase().trim() === billName;
+                      return (tx.description || '').toLowerCase().trim() === billName;
                     })
                     .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
                   if (lastPaymentTx) {
