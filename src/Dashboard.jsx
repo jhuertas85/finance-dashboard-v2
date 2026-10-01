@@ -543,24 +543,25 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
       if (isPaid) {
         return { ...bill, isPaid: true, daysUntilDue: dayNum - now.getDate() };
       }
-      // Find the most recent payment for this bill in transaction history
       const billName = (bill.name || '').toLowerCase().trim();
-      const lastPaymentTx = [...transactions]
-        .filter(tx => {
-          if (tx.type !== 'expense') return false;
-          if (tx.recurringBillId === bill.id) return true;
-          // Fallback: match by description alone — catches manual entries and bills whose ID changed
-          return (tx.description || '').toLowerCase().trim() === billName;
-        })
-        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+      const candidates = transactions.filter(tx => tx.type === 'expense');
+      const byId = candidates.filter(tx => tx.recurringBillId === bill.id);
+      const byName = candidates.filter(tx => (tx.description || '').toLowerCase().trim() === billName);
+      // DEBUG
+      if (bill.name && bill.name.toLowerCase().includes('du')) {
+        console.log('[DU DEBUG]', { billId: bill.id, billName, day, isPaid, byIdCount: byId.length, byNameCount: byName.length, byIdDates: byId.map(t=>t.date), byNameDates: byName.map(t=>t.date) });
+      }
+      const lastPaymentTx = [...byId, ...byName].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
       if (lastPaymentTx) {
-        // Next due = the dueDay of the month after the last payment
         const lastPaid = new Date(lastPaymentTx.date);
         const nextDue = new Date(lastPaid.getFullYear(), lastPaid.getMonth() + 1, dayNum);
         return { ...bill, isPaid: false, daysUntilDue: Math.floor((nextDue - now) / 86400000) };
       }
-      // Never paid — fall back to this month's due date
       return { ...bill, isPaid: false, daysUntilDue: dayNum - now.getDate() };
+    }
+    // DEBUG for bills with no day field
+    if (bill.name && bill.name.toLowerCase().includes('du')) {
+      console.log('[DU DEBUG no-day]', { billId: bill.id, billName: bill.name, day, dayOfMonth: bill.dayOfMonth, dueDay: bill.dueDay, dueDate: bill.dueDate });
     }
     const daysUntilDue = bill.dueDate ? Math.ceil((new Date(bill.dueDate) - now) / 86400000) : null;
     return { ...bill, isPaid, daysUntilDue };
