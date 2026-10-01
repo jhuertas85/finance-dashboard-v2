@@ -743,7 +743,24 @@ export default function AddTransactionModal({ accounts, transactions = [], recur
 
               function daysUntilDue(bill) {
                 const day = bill.dayOfMonth ?? bill.dueDay;
-                if (day != null) return parseInt(day) - todayDay;
+                if (day != null) {
+                  const dayNum = parseInt(day);
+                  if (isBillPaid(bill)) return dayNum - todayDay;
+                  const billName = (bill.name || '').toLowerCase().trim();
+                  const lastPaymentTx = [...transactions]
+                    .filter(tx => {
+                      if (tx.type !== 'expense') return false;
+                      if (tx.recurringBillId === bill.id) return true;
+                      return tx.notes === 'Recurring bill' && (tx.description || '').toLowerCase().trim() === billName;
+                    })
+                    .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                  if (lastPaymentTx) {
+                    const lastPaid = new Date(lastPaymentTx.date);
+                    const nextDue = new Date(lastPaid.getFullYear(), lastPaid.getMonth() + 1, dayNum);
+                    return Math.floor((nextDue - now) / 86400000);
+                  }
+                  return dayNum - todayDay;
+                }
                 if (bill.dueDate) return Math.ceil((new Date(bill.dueDate) - now) / 86400000);
                 return null;
               }

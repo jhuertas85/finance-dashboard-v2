@@ -538,41 +538,34 @@ export default function Dashboard({ accounts, transactions, budgets, recurringBi
     );
   }
 
-  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevMonthBillTx = transactions.filter(tx => {
-    const d = new Date(tx.date);
-    return d.getFullYear() === prevMonthDate.getFullYear() && d.getMonth() === prevMonthDate.getMonth() && tx.type === 'expense';
-  });
-  const prevMonthBillIds = new Set(prevMonthBillTx.map(tx => tx.recurringBillId).filter(Boolean));
-  function isBillRegisteredPrevMonth(bill) {
-    if (prevMonthBillIds.has(bill.id)) return true;
-    const name = (bill.name || '').toLowerCase().trim();
-    return prevMonthBillTx.some(tx =>
-      tx.notes === 'Recurring bill' &&
-      (tx.description || '').toLowerCase().trim() === name
-    );
-  }
-
   const recurringBillsData = recurringBills.map(bill => {
     const day = bill.dayOfMonth ?? bill.dueDay;
+    const isPaid = isBillRegisteredThisMonth(bill);
     if (day != null) {
       const dayNum = parseInt(day);
-      if (now.getDate() >= dayNum) {
-        // Due date already passed (or today) this month
-        return { ...bill, isPaid: isBillRegisteredThisMonth(bill), daysUntilDue: dayNum - now.getDate() };
+      if (isPaid) {
+        return { ...bill, isPaid: true, daysUntilDue: dayNum - now.getDate() };
       }
-      // Due date hasn't arrived yet this month — check if previous month was paid
-      if (!isBillRegisteredPrevMonth(bill)) {
-        // Previous month was skipped — overdue; allow this-month payment to clear it
-        const lastDue = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), dayNum);
-        const daysSince = Math.floor((now - lastDue) / 86400000);
-        return { ...bill, isPaid: isBillRegisteredThisMonth(bill), daysUntilDue: -daysSince };
+      // Find the most recent payment for this bill in transaction history
+      const billName = (bill.name || '').toLowerCase().trim();
+      const lastPaymentTx = [...transactions]
+        .filter(tx => {
+          if (tx.type !== 'expense') return false;
+          if (tx.recurringBillId === bill.id) return true;
+          return tx.notes === 'Recurring bill' && (tx.description || '').toLowerCase().trim() === billName;
+        })
+        .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+      if (lastPaymentTx) {
+        // Next due = the dueDay of the month after the last payment
+        const lastPaid = new Date(lastPaymentTx.date);
+        const nextDue = new Date(lastPaid.getFullYear(), lastPaid.getMonth() + 1, dayNum);
+        return { ...bill, isPaid: false, daysUntilDue: Math.floor((nextDue - now) / 86400000) };
       }
-      // Previous month was paid — next due is later this month
+      // Never paid — fall back to this month's due date
       return { ...bill, isPaid: false, daysUntilDue: dayNum - now.getDate() };
     }
     const daysUntilDue = bill.dueDate ? Math.ceil((new Date(bill.dueDate) - now) / 86400000) : null;
-    return { ...bill, isPaid: isBillRegisteredThisMonth(bill), daysUntilDue };
+    return { ...bill, isPaid, daysUntilDue };
   });
   const overdueBills = recurringBillsData.filter(b => !b.isPaid && b.daysUntilDue != null && b.daysUntilDue < 0);
   const dueSoonBills = recurringBillsData.filter(b => !b.isPaid && b.daysUntilDue != null && b.daysUntilDue >= 0 && b.daysUntilDue <= 2);
