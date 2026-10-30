@@ -37,29 +37,30 @@ function fmtShares(n) {
 // ─── Seed data ────────────────────────────────────────────────────────────────
 const SEED = {
   positions: [
-    // WIO — stocks & ETF (prices from screenshots 23 Jun 2026)
-    { id: 'amd', ticker: 'AMD', name: 'Adv. Micro Devices', platform: 'WIO', type: 'STK', shares: 25.39630338, price: 551.63, costPerShare: 137.91, currency: 'USD', addLevels: [{ price: 420, amount: '$1,500' }], trimLevels: [{ price: 580, action: 'sell 3 sh' }], status: 'HOLD', invalidation: 'below $380 — data-center thesis breaking → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: 'Now $531 · trim fired at $607 ATH (+$1,779 logged) · pulled back · HOLD · re-arm trim at $580, add at $420' },
-    { id: 'nvda', ticker: 'NVDA', name: 'NVIDIA', platform: 'WIO', type: 'STK', shares: 29.79087899, price: 208.65, costPerShare: 181.18, currency: 'USD', addLevels: [{ price: 200, amount: '$1,500' }, { price: 185, amount: '$1,500' }], trimLevels: [{ price: 285, action: 'trim 6 sh' }, { price: 330, action: 'trim 6 sh' }], status: 'HOLD', invalidation: 'below $165 — AI demand narrative breaks → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: 'Now $216 · HOLD · add zone $200 (~7% away) · Blackwell+Rubin demand intact · consensus $303 · trigger set at $200' },
-    { id: 'avgo', ticker: 'AVGO', name: 'Broadcom', platform: 'WIO', type: 'STK', shares: 5.79772382, price: 392.13, costPerShare: 395.40, currency: 'USD', addLevels: [{ price: 345, amount: '$1,200' }, { price: 315, amount: '$1,200' }], trimLevels: [{ price: 500, action: 'trim 2 sh' }], status: 'ACCUMULATE', invalidation: 'below $290 — AI XPU thesis weakens → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: 'Now $329 · BELOW cost ($395) and below $345 add trigger · LIVE ADD per framework · AI XPU FY28 demand intact · add here, more at $315' },
-    { id: 'meta', ticker: 'META', name: 'Meta Platforms', platform: 'WIO', type: 'STK', shares: 4.93349486, price: 563.85, costPerShare: 593.78, currency: 'USD', addLevels: [{ price: 540, amount: '$500' }], trimLevels: [{ price: 750, action: 'trim 1.5 sh' }], status: 'HOLD', invalidation: 'below $500 — FCF deterioration confirms thesis break → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'Now $630 · HOLD · above $540 add / below $750 trim · ⚠ first negative-FCF qtr since 2012 · capex-correction risk · watch thesis not just price' },
-    { id: 'amzn', ticker: 'AMZN', name: 'Amazon', platform: 'WIO', type: 'STK', shares: 9.89225353, price: 232.79, costPerShare: 208.12, currency: 'USD', addLevels: [{ price: 230, amount: '$800' }], trimLevels: [{ price: 290, action: 'trim 3 sh' }], status: 'HOLD', invalidation: 'below $200 — AWS growth re-rating → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'HOLD · AWS +37% · add at $230, trim at $290 · Anthropic stake optionality · levels unchanged' },
-    { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 93.01, costPerShare: 102.81, currency: 'USD', addLevels: [{ price: 130, amount: '$800' }, { price: 115, amount: '$1,000' }], trimLevels: [{ price: 175, action: 'trim 3 sh' }], status: 'HOLD', invalidation: 'below $115 — growth thesis weakens → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: 'Now $104 · HOLD · well below $175 trim · AI ACV growth intact · re-add on pullback to $130/$115' },
-    { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 795.24, costPerShare: 809.73, currency: 'USD', addLevels: [], trimLevels: [], status: 'ACCUMULATE', invalidation: 'n/a — base position, never exit', theme: 'index-base', bucket: 'discretionary', notes: 'S&P base · accumulate on −5% dips · benchmark · never trim · active book is measured against this' },
-    { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.07539626, price: 69.10, costPerShare: 161.14, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', invalidation: 'below $40 — cycle breakdown → EXIT', theme: 'crypto', bucket: 'discretionary', notes: 'Now $95 · 15-20% pullback from recent highs · below cost $161 · crypto bucket near 10% cap · DCA only at $50/$40' },
+    // WIO — stocks & ETF
+    { id: 'amd', ticker: 'AMD', name: 'Adv. Micro Devices', platform: 'WIO', type: 'STK', shares: 25.39630338, price: 514.00, costPerShare: 137.91, currency: 'USD', addLevels: [{ price: 420, amount: '$800' }, { price: 375, amount: '$1,000' }], trimLevels: [{ price: 580, action: 'trim 3 sh' }, { price: 640, action: 'trim 4 sh' }], status: 'HOLD', invalidation: 'below $350 — data-center thesis breaking → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: 'Down ~9% Oct 30 in chip rout · trim at $613 done Sep 28 · between add and trim · never sell for concentration' },
+    { id: 'nvda', ticker: 'NVDA', name: 'NVIDIA', platform: 'WIO', type: 'STK', shares: 29.79087899, price: 206.55, costPerShare: 181.18, currency: 'USD', addLevels: [{ price: 200, amount: '$1,500' }, { price: 185, amount: '$1,500' }], trimLevels: [{ price: 295, action: 'trim 6 sh' }, { price: 340, action: 'trim 6 sh' }], status: 'HOLD', invalidation: 'below $170 — AI demand narrative breaks → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: '3% above $200 add · adds paused while chips make lower lows (semis −5.7% Oct 30) · AI-semi cluster AMD+NVDA+AVGO = 52% of WIO book' },
+    { id: 'avgo', ticker: 'AVGO', name: 'Broadcom', platform: 'WIO', type: 'STK', shares: 5.79772382, price: 343.31, costPerShare: 395.40, currency: 'USD', addLevels: [{ price: 305, amount: '$500 GTC' }], trimLevels: [{ price: 530, action: 'trim 2 sh' }], status: 'HOLD', invalidation: 'below $285 — do not add more, reassess', theme: 'AI-compute', bucket: 'discretionary', notes: 'Live $343 · P/E compression not fundamentals (AI chip rev +221%) · add limit $305 GTC · risks: insider selling, capex scrutiny' },
+    { id: 'meta', ticker: 'META', name: 'Meta Platforms', platform: 'WIO', type: 'STK', shares: 4.93349486, price: 627.00, costPerShare: 593.78, currency: 'USD', addLevels: [{ price: 540, amount: '$500' }, { price: 500, amount: '$500' }], trimLevels: [{ price: 750, action: 'trim 1.5 sh' }, { price: 900, action: 'trim 2 sh' }], status: 'HOLD', invalidation: 'below $430 — FCF thesis breaking → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'First negative FCF quarter since 2012 · capex-correction target · watch thesis, not just price' },
+    { id: 'amzn', ticker: 'AMZN', name: 'Amazon', platform: 'WIO', type: 'STK', shares: 9.89225353, price: 240.87, costPerShare: 208.12, currency: 'USD', addLevels: [{ price: 235, amount: '$800' }], trimLevels: [{ price: 290, action: 'trim 3 sh' }, { price: 325, action: 'trim 3 sh' }], status: 'HOLD', invalidation: 'below $195 — AWS growth re-rating → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: '2% above $235 add · fell on AI spending plan · adds paused until capex selloff stabilizes' },
+    { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 104.00, costPerShare: 102.81, currency: 'USD', addLevels: [{ price: 100, amount: '$500' }, { price: 90, amount: '$500' }], trimLevels: [{ price: 140, action: 'trim 3 sh' }], status: 'HOLD', invalidation: 'below $80 — growth thesis weakens → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: '~-30% after Q3 Oct 28: EPS miss, AI-disrupts-software fear · Rev +20.5%, FY guide raised · at cost · do not sell' },
+    { id: 'goog', ticker: 'GOOG', name: 'Alphabet Class C', platform: 'WIO', type: 'STK', shares: 4, price: 280.00, costPerShare: 280.00, currency: 'USD', addLevels: [{ price: 265, amount: '3 sh ($795) GTC' }], trimLevels: [{ price: 400, action: 'trim 3 sh' }], status: 'HOLD', invalidation: 'below $240 — search revenue shrinking → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'Bought Oct 30 after −12.6% day · Q3 search miss, capex fears · ~15x earnings · near 52-wk low $270.70 · analyst avg ~$400 · add at $265 GTC' },
+    { id: 'koid', ticker: 'KOID', name: 'KOID', platform: 'WIO', type: 'STK', shares: 0, price: 33.75, costPerShare: 0, currency: 'USD', addLevels: [{ price: 33, amount: '$500 GTC' }, { price: 30, amount: '$800' }], trimLevels: [{ price: 55, action: 'trim 10 sh' }, { price: 65, action: 'trim 15 sh' }], status: 'ACCUMULATE', invalidation: 'below $28 → EXIT', theme: 'other', bucket: 'discretionary', notes: 'KOID · add $33 GTC, more at $30 · trim $55/$65 · exit below $28' },
+    { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 832.00, costPerShare: 809.73, currency: 'USD', addLevels: [{ price: 790, amount: '$1,000' }], trimLevels: [], status: 'HOLD', invalidation: 'n/a — base position, never exit', theme: 'index-base', bucket: 'discretionary', notes: 'S&P base · add at $790 on −5% · benchmark · never trim' },
+    { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.07539626, price: 95.19, costPerShare: 161.14, currency: 'USD', addLevels: [], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', invalidation: 'below $40 — cycle breakdown → EXIT', theme: 'crypto', bucket: 'discretionary', notes: 'Crypto bucket ~16% of book vs 10% cap · down ~39% · no adds · BTC $77.4k' },
     // WIO — managed products
     { id: 'wio-wealth', ticker: 'WIO-W', name: 'WIO Wealth · Travel Goal', platform: 'WIO', type: 'WLT', shares: 1, price: 2511.07, costPerShare: 2297.44, currency: 'USD', addLevels: [], trimLevels: [], status: 'HOLD', notes: 'Managed · travel goal · target $10k' },
     { id: 'wio-growth', ticker: 'WIO-G', name: 'WIO Growth Accelerator', platform: 'WIO', type: 'WLT', shares: 1, price: 1950.91, costPerShare: 2000, currency: 'USD', addLevels: [], trimLevels: [], status: 'HOLD', notes: 'Managed · growth accelerator' },
-    // DH / Talabat
-    // Watchlist — not yet entered
-    { id: 'googl', ticker: 'GOOGL', name: 'Alphabet Inc.', platform: 'WIO', type: 'STK', shares: 0, price: 0, costPerShare: 0, currency: 'USD', addLevels: [{ price: 270, amount: '$1,000' }, { price: 255, amount: '$1,500' }], trimLevels: [{ price: 400, action: 'trim 3 sh' }], status: 'ACCUMULATE', invalidation: 'below $240 — search-disruption thesis confirmed → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'Not yet entered · add $255-$270 on dip · trim ~$400 · exit below $240 if search thesis breaks · core AI infra + Search moat' },
+    // Watchlist — not yet entered (Class A; GOOG Class C bought Oct 30)
+    { id: 'googl', ticker: 'GOOGL', name: 'Alphabet Class A', platform: 'WIO', type: 'STK', shares: 0, price: 0, costPerShare: 0, currency: 'USD', addLevels: [], trimLevels: [], status: 'WATCH', invalidation: 'below $240 — search-disruption confirmed → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'GOOG Class C entered Oct 30 · GOOGL Class A watchlist only · no separate position needed' },
     { id: 'msft', ticker: 'MSFT', name: 'Microsoft', platform: 'WIO', type: 'STK', shares: 0, price: 0, costPerShare: 0, currency: 'USD', addLevels: [], trimLevels: [], status: 'WATCH', invalidation: 'TBD on entry confirmation', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'Watchlist · entry not yet confirmed · Azure AI momentum · add/trim bands TBD · confirm setup before buying' },
     // DH / Talabat
-    { id: 'dher', ticker: 'DHER', name: 'Delivery Hero SE', platform: 'DH/Talabat', type: 'STK', shares: 998, price: 36.89, costPerShare: 0, currency: 'EUR', addLevels: [], trimLevels: [{ price: 41.5, action: 'Uber deal price — tender all shares' }], status: 'HOLD', isGrant: true, notes: 'Uber €41.50 deal · stock €37.49 · spread 10.7% · regulatory + >50% accept pending · tender when process opens · 998 grant = pure profit' },
-    { id: 'talabat', ticker: 'TALABAT', name: 'Talabat Holding', platform: 'DH/Talabat', type: 'STK', shares: 6250, price: 0.96, costPerShare: 1.60, currency: 'AED', addLevels: [], trimLevels: [], status: 'WATCH', isEmployerStock: true, notes: 'Employer stock · AED 1.19 now (+24%) · target 1.33-1.88 · Uber/DHER deal positive spillover · hold, working there' },
+    { id: 'dher', ticker: 'DHER', name: 'Delivery Hero SE', platform: 'DH/Talabat', type: 'STK', shares: 998, price: 36.80, costPerShare: 0, currency: 'EUR', addLevels: [], trimLevels: [{ price: 41.5, action: 'tender all 998 sh — Uber offer' }], status: 'ACTION', isGrant: true, invalidation: 'deal collapses → pre-deal price ~EUR 20 · Uber owes DH EUR 700M break fee', notes: 'Uber offer EUR 41.50 · acceptance deadline Nov 5 24:00 Frankfurt · custodian may close earlier · tender all 998 sh · settlement H2 2027' },
+    { id: 'talabat', ticker: 'TALABAT', name: 'Talabat Holding', platform: 'DH/Talabat', type: 'STK', shares: 6250, price: 1.19, costPerShare: 1.60, currency: 'AED', addLevels: [], trimLevels: [], status: 'WATCH', isEmployerStock: true, invalidation: 'below AED 0.80 — cut loss', notes: 'Employer stock · hold to cost AED 1.60 · AED 1.19 now · Uber/DHER deal positive spillover · exit below AED 0.80' },
     // Binance
-    { id: 'shib', ticker: 'SHIB', name: 'Shiba Inu', platform: 'Binance', type: 'CRY', shares: 33631778.8241496213, price: 0.00000458, costPerShare: 0.0000072, currency: 'USD', addLevels: [], trimLevels: [], status: 'WATCH', invalidation: 'below $0.000003 — cut loss', theme: 'crypto', bucket: 'discretionary', notes: 'Meme · 15-20% pullback · 200MA declining · no catalysts · no adds · hold or cut loss' },
-    { id: 'eth', ticker: 'ETH', name: 'Ethereum', platform: 'Binance', type: 'CRY', shares: 1.031663937, price: 1658.07, costPerShare: 3586.88, currency: 'USD', addLevels: [], trimLevels: [{ price: 4000, action: 'break-even exit' }], status: 'WATCH', invalidation: 'below $1,500 — bull cycle broken → EXIT', theme: 'crypto', bucket: 'discretionary', notes: 'Now $2,245 · 15-20% pullback from highs · cost $3,587 still 60% away · hold · no adds until bucket <10%' },
-    { id: 'sol-binance', ticker: 'SOL', name: 'Solana (Binance)', platform: 'Binance', type: 'CRY', shares: 40.1310624738, price: 69.13, costPerShare: 159.46, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', invalidation: 'below $40 — cycle breakdown → EXIT', theme: 'crypto', bucket: 'discretionary', notes: 'Now $95 · 15-20% pullback from recent highs · below cost $159 · crypto bucket near 10% cap · DCA only at $50/$40' },
+    { id: 'shib', ticker: 'SHIB', name: 'Shiba Inu', platform: 'Binance', type: 'CRY', shares: 33631778.8241496213, price: 0.000004736, costPerShare: 0.0000072, currency: 'USD', addLevels: [], trimLevels: [], status: 'WATCH', invalidation: 'below $0.000003 — cut loss', theme: 'crypto', bucket: 'discretionary', notes: 'Crypto bucket ~16% of book vs 10% cap · no adds · hold or cut loss' },
+    { id: 'eth', ticker: 'ETH', name: 'Ethereum', platform: 'Binance', type: 'CRY', shares: 1.031663937, price: 2234.86, costPerShare: 3586.88, currency: 'USD', addLevels: [], trimLevels: [{ price: 4000, action: 'break-even exit' }], status: 'WATCH', invalidation: 'below $1,500 — bull cycle broken → EXIT', theme: 'crypto', bucket: 'discretionary', notes: 'Crypto bucket ~16% of book vs 10% cap · cost $3,587 · hold · no adds until bucket <10%' },
+    { id: 'sol-binance', ticker: 'SOL', name: 'Solana (Binance)', platform: 'Binance', type: 'CRY', shares: 40.1310624738, price: 95.19, costPerShare: 159.46, currency: 'USD', addLevels: [], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', invalidation: 'below $40 — cycle breakdown → EXIT', theme: 'crypto', bucket: 'discretionary', notes: 'Crypto bucket ~16% of book vs 10% cap · down ~39% · no adds · BTC $77.4k' },
   ],
   closedPositions: [
     { id: 'cake-c', closedFromActiveId: 'cake', ticker: 'CAKE', platform: 'WIO', type: 'STK', closedDate: '31 Jul 26', qty: 11, sellPrice: '$101.62', costAED: 534, proceeds: 1118, gainLoss: 584, pct: 109.5 },
@@ -82,7 +83,7 @@ const SEED = {
     { id: 'c98-c', ticker: 'C98', platform: 'Binance', type: 'CRY', closedDate: '18 Jun 24', qty: 57.99, sellPrice: '$0.05', costAED: 200, proceeds: 3, gainLoss: -197, pct: -98.6 },
     { id: 'luna-c', ticker: 'LUNA', platform: 'Binance', type: 'CRY', closedDate: '12 May 22', qty: 112.1, sellPrice: '$0', costAED: 200, proceeds: 0, gainLoss: -200, pct: -100 },
   ],
-  config: { dryCash: 5500, addPriority: 'AVGO (live $329) → GOOGL $255-270 → NVDA $200 → AMD $420', lastUpdated: null, analysisDate: '2026-10-30T00:00:00.000Z' },
+  config: { dryCash: 4380, addPriority: 'AVGO $305 GTC → GOOG $265 GTC → NOW $100/$90 → KOID $33 GTC', lastUpdated: null, analysisDate: '2026-10-30T21:00:00.000Z' },
 };
 
 // Analysis fields driven by code — merged over Firestore on every load
@@ -96,8 +97,8 @@ function mergeAnalysis(firestoreData) {
   const firestoreIds = new Set((firestoreData.positions || []).map(p => p.id));
   // Watchlist positions: in SEED with shares=0 but not yet in Firestore
   const watchlistPositions = SEED.positions
-    .filter(s => s.shares === 0 && !firestoreIds.has(s.id))
-    .map(s => ({ ...s, _watchlist: true }));
+    .filter(s => !firestoreIds.has(s.id))
+    .map(s => ({ ...s, _watchlist: s.shares === 0 }));
 
   const positions = [
     ...watchlistPositions,
@@ -140,6 +141,8 @@ const TICKER_URLS = {
   SHIB:   'https://twelvedata.com/markets/870480/crypto/coinbase-pro/shib-usd',
   DHER:   'https://twelvedata.com/markets/145211/stock/xetr/dher',
   TALABAT: 'https://www.tradingview.com/symbols/DFM-TALABAT/',
+  GOOG:    'https://finance.yahoo.com/quote/GOOG',
+  KOID:    'https://finance.yahoo.com/quote/KOID',
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -149,7 +152,7 @@ function TypeBadge({ type }) {
 }
 
 function StatusBadge({ status }) {
-  const s = { HOLD: 'bg-neutral-800 text-gray-400 border-neutral-700', ACCUMULATE: 'bg-blue-900/40 text-blue-300 border-blue-700/50', WATCH: 'bg-amber-900/40 text-amber-300 border-amber-700/50', TRIM: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50', EXIT: 'bg-red-900/50 text-red-300 border-red-700/60' };
+  const s = { HOLD: 'bg-neutral-800 text-gray-400 border-neutral-700', ACCUMULATE: 'bg-blue-900/40 text-blue-300 border-blue-700/50', WATCH: 'bg-amber-900/40 text-amber-300 border-amber-700/50', TRIM: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50', EXIT: 'bg-red-900/50 text-red-300 border-red-700/60', ACTION: 'bg-red-600 text-white border-red-400 animate-pulse' };
   return <span className={`inline-block text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${s[status] || s.HOLD}`}>{status}</span>;
 }
 
@@ -486,6 +489,17 @@ export default function Investments({ accounts = [] }) {
     }).catch(() => setLoading(false));
   }, []);
 
+  // Auto-fetch prices on load if stale (>30 min since last update)
+  const autoPriceFetchDone = useRef(false);
+  useEffect(() => {
+    if (loading) return;
+    if (autoPriceFetchDone.current) return;
+    autoPriceFetchDone.current = true;
+    const lastUpd = data.config?.lastUpdated;
+    const ageMs = lastUpd ? Date.now() - new Date(lastUpd).getTime() : Infinity;
+    if (ageMs > 30 * 60 * 1000) refreshPrices();
+  }, [loading]);
+
   // ── Initial sync once both investment data and accounts are ready ──
   useEffect(() => {
     if (!loading && accounts.length > 0 && !initialSyncDone.current) {
@@ -519,7 +533,7 @@ export default function Investments({ accounts = [] }) {
         const prices = await r.json();
         updated.forEach((p, i) => {
           if (p.type === 'CRY' && CG_IDS[p.ticker] && prices[CG_IDS[p.ticker]]?.usd) {
-            updated[i] = { ...p, price: prices[CG_IDS[p.ticker]].usd };
+            updated[i] = { ...p, price: prices[CG_IDS[p.ticker]].usd, priceUpdatedAt: new Date().toISOString() };
             ok++;
           }
         });
@@ -529,8 +543,8 @@ export default function Investments({ accounts = [] }) {
     // 2. Stocks via Yahoo Finance (no API key required — fetched in parallel)
     const yahooMap = {
       AMD: 'AMD', NVDA: 'NVDA', AVGO: 'AVGO', META: 'META', AMZN: 'AMZN',
-      NOW: 'NOW', CAKE: 'CAKE', GOOGL: 'GOOGL', MSFT: 'MSFT',
-      CSPX: 'CSPX.L', DHER: 'DHER.DE', TALABAT: 'TALABAT.DFM',
+      NOW: 'NOW', CAKE: 'CAKE', GOOG: 'GOOG', GOOGL: 'GOOGL', MSFT: 'MSFT',
+      KOID: 'KOID', CSPX: 'CSPX.L', DHER: 'DHER.DE', TALABAT: 'TALABAT.DFM',
     };
     const stockPositions = updated.filter(p => p.type === 'STK' || p.type === 'ETF');
     const stockTickers = [...new Set(stockPositions.map(p => p.ticker).filter(t => yahooMap[t]))];
@@ -547,8 +561,9 @@ export default function Investments({ accounts = [] }) {
           const j = await r.json();
           const price = j.chart?.result?.[0]?.meta?.regularMarketPrice;
           if (price && price > 0) {
+            const fetchedAt = new Date().toISOString();
             updated.forEach((p, i) => {
-              if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
+              if (p.ticker === ticker) { updated[i] = { ...p, price, priceUpdatedAt: fetchedAt }; ok++; }
             });
           } else { fail++; }
         } catch { fail++; }
@@ -688,6 +703,15 @@ export default function Investments({ accounts = [] }) {
   return (
     <div className="space-y-5 pb-16">
 
+      {/* ── DHER tender deadline banner ── */}
+      <div className="bg-red-950/60 border border-red-700/70 rounded-xl px-4 py-3 flex items-center gap-3">
+        <span className="text-red-400 text-base font-bold">⚠</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-red-300 font-bold text-sm">DHER tender deadline: Nov 5, 24:00 Frankfurt</span>
+          <span className="text-red-400/70 text-xs ml-2">Confirm shares tendered · Uber offer EUR 41.50 · 998 sh · settlement H2 2027 · custodian may close earlier</span>
+        </div>
+      </div>
+
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -800,7 +824,12 @@ export default function Investments({ accounts = [] }) {
                     </td>
                     <td className="px-3 py-3 text-right">
                       <div className="font-mono text-gray-300">{fmtShares(pos.shares)}</div>
-                      <div className="text-[10px] text-gray-500 font-mono">{fmtPrice(pos.price, pos.currency)}</div>
+                      <div className="text-[10px] text-gray-500 font-mono flex items-center justify-end gap-1">
+                        {pos.priceUpdatedAt && (Date.now() - new Date(pos.priceUpdatedAt).getTime()) > 24 * 60 * 60 * 1000 && (
+                          <span title={`Price last updated: ${new Date(pos.priceUpdatedAt).toLocaleString()}`} className="text-amber-600 cursor-help">⚠</span>
+                        )}
+                        {fmtPrice(pos.price, pos.currency)}
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-right font-mono text-gray-500">
                       {pos.costPerShare > 0 ? fmtPrice(pos.costPerShare, pos.currency) : <span className="text-emerald-600 text-[10px]">grant</span>}
@@ -893,10 +922,13 @@ export default function Investments({ accounts = [] }) {
             <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">AMD</span><span className="text-[10px] text-gray-500 ml-2">never sell for concentration</span></div>
             <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">CSPX</span><span className="text-[10px] text-gray-500 ml-2">base · only add on −5/−10%</span></div>
             <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">CAKE</span><span className="text-[10px] text-gray-500 ml-2">no adds · trim at $90</span></div>
-            <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">DHER</span><span className="text-[9px] bg-amber-900/50 text-amber-400 px-1 rounded font-mono ml-1">grant</span><span className="text-[10px] text-gray-500 ml-2">work shares · sell into €40+ strength · pure upside</span></div>
+            <div className="py-2 border-b border-neutral-900"><span className="font-bold text-red-300 text-xs">DHER</span><span className="text-[9px] bg-amber-900/50 text-amber-400 px-1 rounded font-mono ml-1">grant</span><span className="text-[10px] text-red-400/70 ml-2">⚠ tender deadline Nov 5 · Uber €41.50 · 998 sh · ACTION REQUIRED</span></div>
             <div className="py-2 border-b border-neutral-900"><span className="font-bold text-white text-xs">TALABAT</span><span className="text-[9px] bg-amber-900/50 text-amber-400 px-1 rounded font-mono ml-1">employer</span><span className="text-[10px] text-gray-500 ml-2">work there · hold · not counted in concentration</span></div>
-            <div className="py-2 border-b border-neutral-900"><span className="font-bold text-amber-400 text-xs">Crypto</span><span className="text-[10px] text-gray-500 ml-2">DCA only at deep levels · target break-even</span></div>
-            <div className="py-2"><span className="text-blue-400 text-xs font-mono">Today</span><span className="text-[10px] text-blue-300 ml-2 font-semibold">AVGO: LIVE ADD ($329 · below $345 trigger)</span><span className="text-[10px] text-gray-500 ml-2">· all else hold</span></div>
+            <div className="py-2 border-b border-neutral-900"><span className="font-bold text-amber-400 text-xs">Crypto</span><span className="text-[10px] text-gray-500 ml-2">bucket ~16% vs 10% cap · no new adds · no DCA until normalized</span></div>
+            <div className="py-2"><span className="text-red-400 text-xs font-mono font-bold">⚠ NOW</span><span className="text-[10px] text-red-300 ml-2 font-semibold">Tender DHER before Nov 5, 24:00 Frankfurt</span></div>
+            <div className="py-2"><span className="text-blue-400 text-xs font-mono">GTC limits</span><span className="text-[10px] text-blue-300 ml-2">AVGO $305 · GOOG $265 (3 sh) · NOW $100/$90 · KOID $33</span></div>
+            <div className="py-2"><span className="text-amber-500 text-xs font-mono">Paused</span><span className="text-[10px] text-gray-500 ml-2">NVDA adds · AMZN adds — sector making lower lows (semis −5.7% Oct 30)</span></div>
+            <div className="py-2"><span className="text-gray-600 text-xs font-mono">Rule</span><span className="text-[10px] text-gray-600 ml-2">Sector-rout filter: pause adds when a sector makes lower lows over ~10 days, even if price trigger fires</span></div>
           </div>
         </div>
       </div>
