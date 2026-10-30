@@ -43,7 +43,7 @@ const SEED = {
     { id: 'avgo', ticker: 'AVGO', name: 'Broadcom', platform: 'WIO', type: 'STK', shares: 5.79772382, price: 392.13, costPerShare: 395.40, currency: 'USD', addLevels: [{ price: 345, amount: '$1,200' }, { price: 315, amount: '$1,200' }], trimLevels: [{ price: 500, action: 'trim 2 sh' }], status: 'ACCUMULATE', invalidation: 'below $290 — AI XPU thesis weakens → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: 'Now $329 · BELOW cost ($395) and below $345 add trigger · LIVE ADD per framework · AI XPU FY28 demand intact · add here, more at $315' },
     { id: 'meta', ticker: 'META', name: 'Meta Platforms', platform: 'WIO', type: 'STK', shares: 4.93349486, price: 563.85, costPerShare: 593.78, currency: 'USD', addLevels: [{ price: 540, amount: '$500' }], trimLevels: [{ price: 750, action: 'trim 1.5 sh' }], status: 'HOLD', invalidation: 'below $500 — FCF deterioration confirms thesis break → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'Now $630 · HOLD · above $540 add / below $750 trim · ⚠ first negative-FCF qtr since 2012 · capex-correction risk · watch thesis not just price' },
     { id: 'amzn', ticker: 'AMZN', name: 'Amazon', platform: 'WIO', type: 'STK', shares: 9.89225353, price: 232.79, costPerShare: 208.12, currency: 'USD', addLevels: [{ price: 230, amount: '$800' }], trimLevels: [{ price: 290, action: 'trim 3 sh' }], status: 'HOLD', invalidation: 'below $200 — AWS growth re-rating → EXIT', theme: 'mega-cap-growth', bucket: 'discretionary', notes: 'HOLD · AWS +37% · add at $230, trim at $290 · Anthropic stake optionality · levels unchanged' },
-    { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 93.01, costPerShare: 102.81, currency: 'USD', addLevels: [{ price: 130, amount: '$800' }, { price: 115, amount: '$1,000' }], trimLevels: [{ price: 175, action: 'trim 3 sh' }], status: 'HOLD', invalidation: 'below $115 — growth thesis weakens → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: 'Now $158 · HOLD · approaching $175 trim (+11%) · AI ACV growth intact · re-add on pullback to $130/$115' },
+    { id: 'now', ticker: 'NOW', name: 'ServiceNow', platform: 'WIO', type: 'STK', shares: 9.8993178, price: 93.01, costPerShare: 102.81, currency: 'USD', addLevels: [{ price: 130, amount: '$800' }, { price: 115, amount: '$1,000' }], trimLevels: [{ price: 175, action: 'trim 3 sh' }], status: 'HOLD', invalidation: 'below $115 — growth thesis weakens → EXIT', theme: 'AI-compute', bucket: 'discretionary', notes: 'Now $104 · HOLD · well below $175 trim · AI ACV growth intact · re-add on pullback to $130/$115' },
     { id: 'cspx', ticker: 'CSPX', name: 'iShares S&P 500 UCITS', platform: 'WIO', type: 'ETF', shares: 4.99747, price: 795.24, costPerShare: 809.73, currency: 'USD', addLevels: [], trimLevels: [], status: 'ACCUMULATE', invalidation: 'n/a — base position, never exit', theme: 'index-base', bucket: 'discretionary', notes: 'S&P base · accumulate on −5% dips · benchmark · never trim · active book is measured against this' },
     { id: 'sol-wio', ticker: 'SOL', name: 'Solana (WIO)', platform: 'WIO', type: 'CRY', shares: 14.07539626, price: 69.10, costPerShare: 161.14, currency: 'USD', addLevels: [{ price: 50, amount: 'DCA' }, { price: 40, amount: 'DCA' }], trimLevels: [{ price: 140, action: 'partial exit' }], status: 'WATCH', invalidation: 'below $40 — cycle breakdown → EXIT', theme: 'crypto', bucket: 'discretionary', notes: 'Now $95 · 15-20% pullback from recent highs · below cost $161 · crypto bucket near 10% cap · DCA only at $50/$40' },
     // WIO — managed products
@@ -452,9 +452,6 @@ export default function Investments({ accounts = [] }) {
   const [addingPos, setAddingPos] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('twelvedata_key') || '');
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [keyDraft, setKeyDraft] = useState('');
 
   // ── Sync investment platform totals → usable account balances ──
   const initialSyncDone = useRef(false);
@@ -529,42 +526,41 @@ export default function Investments({ accounts = [] }) {
       } catch { fail++; }
     }
 
-    // 2. Stocks via Twelve Data (free key at twelvedata.com — 800 calls/day)
-    // US stocks and international stocks fetched separately so one failing doesn't block the other
-    const twelveUSMap   = { AMD: 'AMD', NVDA: 'NVDA', AVGO: 'AVGO', META: 'META', AMZN: 'AMZN', NOW: 'NOW', CAKE: 'CAKE' };
-    const twelveIntlMap = { CSPX: 'CSPX:LSE', DHER: 'DHER:XETR' };
+    // 2. Stocks via Yahoo Finance (no API key required — fetched in parallel)
+    const yahooMap = {
+      AMD: 'AMD', NVDA: 'NVDA', AVGO: 'AVGO', META: 'META', AMZN: 'AMZN',
+      NOW: 'NOW', CAKE: 'CAKE', GOOGL: 'GOOGL', MSFT: 'MSFT',
+      CSPX: 'CSPX.L', DHER: 'DHER.DE', TALABAT: 'TALABAT.DFM',
+    };
+    const stockPositions = updated.filter(p => p.type === 'STK' || p.type === 'ETF');
+    const stockTickers = [...new Set(stockPositions.map(p => p.ticker).filter(t => yahooMap[t]))];
 
-    async function fetchTwelve(map) {
-      const stockPositions = updated.filter(p => p.type === 'STK' || p.type === 'ETF');
-      const syms = [...new Set(stockPositions.map(p => map[p.ticker]).filter(Boolean))];
-      if (!syms.length) return;
-      const r = await fetch(`https://api.twelvedata.com/price?symbol=${syms.join(',')}&apikey=${apiKey}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const resp = await r.json();
-      if (resp.code) throw new Error(resp.message || 'API error'); // top-level error from Twelve Data
-      const bySymbol = syms.length === 1 ? { [syms[0]]: resp } : resp;
-      Object.entries(map).forEach(([ticker, sym]) => {
-        const price = parseFloat(bySymbol[sym]?.price);
-        if (!price || price <= 0 || isNaN(price)) return;
-        updated.forEach((p, i) => {
-          if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
-        });
-      });
-    }
-
-    if (apiKey) {
-      try { await fetchTwelve(twelveUSMap); } catch { fail++; }
-      try { await fetchTwelve(twelveIntlMap); } catch { /* international may not be on free plan */ }
-    }
+    await Promise.all(
+      stockTickers.map(async (ticker) => {
+        const sym = yahooMap[ticker];
+        try {
+          const r = await fetch(
+            `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`,
+            { headers: { Accept: 'application/json' } }
+          );
+          if (!r.ok) { fail++; return; }
+          const j = await r.json();
+          const price = j.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if (price && price > 0) {
+            updated.forEach((p, i) => {
+              if (p.ticker === ticker) { updated[i] = { ...p, price }; ok++; }
+            });
+          } else { fail++; }
+        } catch { fail++; }
+      })
+    );
 
     const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const newData = { ...data, positions: updated, config: { ...data.config, lastUpdated: new Date().toISOString() } };
     await persist(newData);
     await syncToAccounts(updated);
-    if (!apiKey) {
-      setPriceMsg(`Crypto updated · stocks need API key · click "API Key" to add · ${now}`);
-    } else if (fail > 0) {
-      setPriceMsg(`Partial update · ${ok} tickers · some failed · ${now}`);
+    if (fail > 0) {
+      setPriceMsg(`Updated ${ok} · ${fail} failed · ${now}`);
     } else {
       setPriceMsg(`All prices updated · ${ok} tickers · ${now}`);
     }
@@ -704,38 +700,6 @@ export default function Investments({ accounts = [] }) {
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {saving && <span className="text-xs text-gray-500">Saving…</span>}
           {priceMsg && <span className="text-xs text-gray-500 max-w-xs text-right">{priceMsg}</span>}
-
-          {/* API key input */}
-          {showKeyInput ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                value={keyDraft}
-                onChange={e => setKeyDraft(e.target.value)}
-                placeholder="Paste Twelve Data key…"
-                className="bg-neutral-800 border border-neutral-600 rounded-lg px-2.5 py-1.5 text-white text-xs w-56 outline-none focus:border-emerald-500"
-                autoFocus
-              />
-              <button
-                onClick={() => {
-                  const k = keyDraft.trim();
-                  if (k) { localStorage.setItem('twelvedata_key', k); setApiKey(k); }
-                  setShowKeyInput(false); setKeyDraft('');
-                }}
-                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition">
-                Save
-              </button>
-              <button onClick={() => { setShowKeyInput(false); setKeyDraft(''); }}
-                className="px-2 py-1.5 text-gray-500 hover:text-white text-xs transition">✕</button>
-            </div>
-          ) : (
-            <button
-              onClick={() => { setKeyDraft(apiKey); setShowKeyInput(true); }}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold border transition ${apiKey ? 'bg-neutral-800 border-neutral-700 text-gray-400 hover:border-neutral-500' : 'bg-amber-900/30 border-amber-700 text-amber-400 hover:border-amber-500'}`}
-              title={apiKey ? 'Twelve Data key set — click to change' : 'Add Twelve Data API key for live stock prices'}>
-              {apiKey ? '🔑 API Key' : '⚠ API Key'}
-            </button>
-          )}
 
           <button onClick={() => setAddingPos(true)}
             className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-gray-300 rounded-xl text-xs font-semibold hover:border-neutral-500 transition">
